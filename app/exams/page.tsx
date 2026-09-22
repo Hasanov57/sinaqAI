@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { ExamBrowser } from "@/components/exam/exam-browser";
-import { demoExams } from "@/lib/data/demo-exams";
+import { availableExams } from "@/lib/data/demo-exams";
 
 export const metadata: Metadata = { title: "İmtahanlar" };
 
@@ -16,7 +16,7 @@ export default function ExamsPage() {
       </header>
       <section className="section">
         <div className="shell">
-          <ExamBrowser exams={demoExams} />
+          <ExamBrowser exams={availableExams} />
         </div>
       </section>
     </>

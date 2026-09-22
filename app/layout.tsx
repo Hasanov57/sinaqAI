@@ -26,7 +26,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="az">
+    <html lang="az" data-scroll-behavior="smooth">
       <body className={`${inter.variable} ${manrope.variable}`}>
         <SiteHeader />
         <main>{children}</main>

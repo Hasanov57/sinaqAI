@@ -32,6 +32,11 @@ export type ExamQuestion = {
   options: QuestionOption[];
   maxScore: number;
   officialExplanation?: string;
+  questionImageUrl?: string;
+  questionImageWidth?: number;
+  questionImageHeight?: number;
+  variantNumbers?: Record<"A" | "B" | "C" | "D", number>;
+  sourcePage?: number;
 };
 
 export type Exam = {
@@ -44,12 +49,15 @@ export type Exam = {
   grade: number;
   groupName?: string;
   languageSection: "AZ" | "RU";
-  durationMinutes: number;
+  durationMinutes?: number;
   subjects: string[];
   questionCount: number;
   maxScore: number;
-  status: "demo" | "published";
+  status: "demo" | "draft" | "published";
   sourceUrl?: string;
+  sourceOrganization?: string;
+  datasetLabel?: string;
+  usesOfficialScoring?: boolean;
   questions: ExamQuestion[];
 };
 

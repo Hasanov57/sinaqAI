@@ -19,7 +19,9 @@ export default async function ExamDetailPage({ params }: Props) {
     <>
       <header className="page-hero">
         <div className="shell">
-          <p className="eyebrow">{exam.status === "demo" ? "Demo imtahan" : exam.year}</p>
+          <p className="eyebrow">
+            {exam.status === "demo" ? "Demo imtahan" : exam.datasetLabel ?? exam.year}
+          </p>
           <h1 className="page-title">{exam.title}</h1>
           <p>{exam.subjects.join(" · ")}</p>
         </div>
@@ -32,27 +34,34 @@ export default async function ExamDetailPage({ params }: Props) {
               <div className="info-item"><dt>İmtahan növü</dt><dd>{exam.typeLabel}</dd></div>
               <div className="info-item"><dt>Sinif</dt><dd>{exam.grade}-ci sinif</dd></div>
               <div className="info-item"><dt>Sual sayı</dt><dd>{exam.questionCount}</dd></div>
-              <div className="info-item"><dt>Müddət</dt><dd>{exam.durationMinutes} dəqiqə</dd></div>
+              <div className="info-item"><dt>Müddət</dt><dd>{exam.durationMinutes ? `${exam.durationMinutes} dəqiqə` : "Rəsmi izah PDF-ində göstərilməyib"}</dd></div>
               <div className="info-item"><dt>Dil bölməsi</dt><dd>{exam.languageSection}</dd></div>
-              <div className="info-item"><dt>Maksimum bal</dt><dd>{exam.maxScore}</dd></div>
+              <div className="info-item"><dt>{exam.usesOfficialScoring === false ? "Test göstəricisi" : "Maksimum bal"}</dt><dd>{exam.usesOfficialScoring === false ? `${exam.questionCount} sual üzrə düzgün cavab sayı` : exam.maxScore}</dd></div>
             </dl>
             <div className="notice">
               <Info size={20} />
               <div>
-                <strong>Demo məlumatı</strong><br />
-                Bu imtahan platformanın iş prinsipini göstərmək üçün hazırlanıb və rəsmi DİM imtahanı deyil.
+                <strong>{exam.status === "draft" ? "Məhdud test dataseti" : "Demo məlumatı"}</strong><br />
+                {exam.status === "draft"
+                  ? "Suallar DİM-in rəsmi izah PDF-indən götürülüb, lakin bu 15 suallıq seçim tam imtahan deyil. PDF-də rəsmi bal qaydası göstərilmədiyi üçün yalnız düzgün cavab sayı hesablanır."
+                  : "Bu imtahan platformanın iş prinsipini göstərmək üçün hazırlanıb və rəsmi DİM imtahanı deyil."}
               </div>
             </div>
+            {exam.sourceUrl && exam.sourceOrganization && (
+              <p className="source-link">
+                Mənbə: <a href={exam.sourceUrl} rel="noreferrer" target="_blank">{exam.sourceOrganization}</a>
+              </p>
+            )}
           </article>
 
           <aside className="side-card">
             <span className="badge"><FileQuestion size={14} /> {exam.questionCount} sual</span>
-            <p className="score-big">{exam.maxScore} bal</p>
+            <p className="score-big">{exam.usesOfficialScoring === false ? `${exam.questionCount} sual` : `${exam.maxScore} bal`}</p>
             <Link className="button" href={`/exams/${exam.id}/start`}>
               İmtahana başla
             </Link>
             <div className="side-notes">
-              <span><Clock3 size={17} /> Vaxt göstəricisi aktivdir</span>
+              <span><Clock3 size={17} /> {exam.durationMinutes ? "Vaxt göstəricisi aktivdir" : "Keçən vaxt göstərilir"}</span>
               <span><CheckCircle2 size={17} /> Cavablar cihazda saxlanır</span>
               <span><Languages size={17} /> Azərbaycan dili bölməsi</span>
               <span><ShieldCheck size={17} /> Yoxlama qayda əsaslıdır</span>

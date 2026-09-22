@@ -82,7 +82,10 @@ export function ResultView({ attemptId }: { attemptId: string }) {
             </div>
           </div>
           <div className="score-ring" style={{ "--score": `${percentage * 3.6}deg` } as React.CSSProperties}>
-            <div><strong>{percentage}%</strong><span>{result.score} / {result.maxScore} bal</span></div>
+            <div>
+              <strong>{percentage}%</strong>
+              <span>{result.score} / {result.maxScore} {exam.usesOfficialScoring === false ? "düzgün" : "bal"}</span>
+            </div>
           </div>
         </div>
       </section>
@@ -102,7 +105,7 @@ export function ResultView({ attemptId }: { attemptId: string }) {
               <div className="subject-results">
                 {subjectStats.map(([subject, stats]) => (
                   <article className="subject-result" key={subject}>
-                    <div className="subject-result-top"><strong>{subject}</strong><span>{stats.score} / {stats.maxScore} bal</span></div>
+                    <div className="subject-result-top"><strong>{subject}</strong><span>{stats.score} / {stats.maxScore} {exam.usesOfficialScoring === false ? "düzgün" : "bal"}</span></div>
                     <div className="result-bar"><span style={{ width: `${(stats.score / stats.maxScore) * 100}%` }} /></div>
                     <div className="subject-counts"><span>{stats.correct} düzgün</span><span>{stats.wrong} səhv</span><span>{stats.unanswered} cavabsız</span></div>
                   </article>
@@ -146,7 +149,11 @@ export function ResultView({ attemptId }: { attemptId: string }) {
                         <div><span>Düzgün cavab</span><strong>{answer.correctKey}</strong></div>
                       </div>
                       {question.officialExplanation && (
-                        <div className="official-explanation"><strong>Demo izahı</strong><p>{question.officialExplanation}</p></div>
+                        <div className="official-explanation">
+                          <strong>{exam.status === "draft" ? "DİM rəsmi izahı" : "Demo izahı"}</strong>
+                          <p>{question.officialExplanation}</p>
+                          {question.sourcePage && <small>Mənbə səhifəsi: {question.sourcePage}</small>}
+                        </div>
                       )}
                     </div>
                   </details>

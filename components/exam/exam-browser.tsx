@@ -58,12 +58,17 @@ export function ExamBrowser({ exams }: { exams: Exam[] }) {
               <div className="exam-card-top">
                 <span className="badge"><CalendarDays size={14} /> {exam.year}</span>
                 {exam.status === "demo" && <span className="badge badge-demo">DEMO</span>}
+                {exam.status === "draft" && <span className="badge badge-draft">TEST DATASET</span>}
               </div>
               <h2>{exam.title}</h2>
               <div className="exam-card-meta">
                 <span><GraduationCap size={17} /> {exam.grade}-ci sinif</span>
                 <span><FileQuestion size={17} /> {exam.questionCount} sual</span>
-                <span><Clock3 size={17} /> {exam.durationMinutes} dəqiqə</span>
+                {exam.durationMinutes ? (
+                  <span><Clock3 size={17} /> {exam.durationMinutes} dəqiqə</span>
+                ) : (
+                  <span><Clock3 size={17} /> Vaxt limiti göstərilməyib</span>
+                )}
               </div>
               <div className="subject-list">
                 {exam.subjects.map((item) => <span key={item}>{item}</span>)}

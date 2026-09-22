@@ -8,9 +8,12 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "validate:data": "node scripts/validate-exam-dataset.mjs",
+    "import:exam": "node scripts/import-exam.mjs"
   },
   "dependencies": {
+    "@next/env": "^16.3.5",
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.116.0",
     "lucide-react": "^0.544.0",

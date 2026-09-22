@@ -1,4 +1,5 @@
 import type { Exam } from "@/types/exam";
+import { officialTestExam } from "./official-exams";
 
 export const demoExams: Exam[] = [
   {
@@ -118,6 +119,8 @@ export const demoExams: Exam[] = [
   },
 ];
 
+export const availableExams: Exam[] = [officialTestExam, ...demoExams];
+
 export function getExam(examId: string) {
-  return demoExams.find((exam) => exam.id === examId);
+  return availableExams.find((exam) => exam.id === examId);
 }

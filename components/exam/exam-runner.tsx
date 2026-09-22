@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, Clock3, Flag, Save, X } from "lucide-react";
 import { gradeExam } from "@/lib/grading/grading";
@@ -22,7 +23,7 @@ export function ExamRunner({ exam }: { exam: Exam }) {
   const router = useRouter();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [attempt, setAttempt] = useState<SavedAttempt | null>(null);
-  const [remainingSeconds, setRemainingSeconds] = useState(exam.durationMinutes * 60);
+  const [timerSeconds, setTimerSeconds] = useState(exam.durationMinutes ? exam.durationMinutes * 60 : 0);
   const [showConfirm, setShowConfirm] = useState(false);
   const [hydrated, setHydrated] = useState(false);
   const storageKey = `sinaqai:active:${exam.id}`;
@@ -53,7 +54,11 @@ export function ExamRunner({ exam }: { exam: Exam }) {
     if (!attempt) return;
     const updateTimer = () => {
       const elapsed = Math.floor((Date.now() - new Date(attempt.startedAt).getTime()) / 1000);
-      setRemainingSeconds(Math.max(0, exam.durationMinutes * 60 - elapsed));
+      setTimerSeconds(
+        exam.durationMinutes
+          ? Math.max(0, exam.durationMinutes * 60 - elapsed)
+          : Math.max(0, elapsed),
+      );
     };
     updateTimer();
     const timer = window.setInterval(updateTimer, 1000);
@@ -63,6 +68,10 @@ export function ExamRunner({ exam }: { exam: Exam }) {
   const currentQuestion = exam.questions[currentIndex];
   const answeredCount = Object.keys(attempt?.answers ?? {}).length;
   const progress = Math.round((answeredCount / exam.questionCount) * 100);
+  const subjects = useMemo(
+    () => [...new Set(exam.questions.map((question) => question.subject))],
+    [exam.questions],
+  );
 
   const subjectQuestionNumber = useMemo(() => {
     return exam.questions
@@ -97,19 +106,51 @@ export function ExamRunner({ exam }: { exam: Exam }) {
           <span className="exam-kicker">{currentQuestion.subject}</span>
           <strong>{exam.title}</strong>
         </div>
-        <div className={`exam-timer ${remainingSeconds < 300 ? "timer-warning" : ""}`}>
+        <div
+          className={`exam-timer ${exam.durationMinutes && timerSeconds < 300 ? "timer-warning" : ""}`}
+          aria-label={exam.durationMinutes ? "Qalan vaxt" : "Keçən vaxt"}
+          title={exam.durationMinutes ? "Qalan vaxt" : "Keçən vaxt"}
+        >
           <Clock3 size={19} />
-          <span>{formatTime(remainingSeconds)}</span>
+          <span>{formatTime(timerSeconds)}</span>
         </div>
       </header>
 
       <div className="exam-layout">
         <section className="question-panel">
+          <div className="subject-tabs" aria-label="Fənn seçimi">
+            {subjects.map((subject) => {
+              const subjectQuestions = exam.questions.filter((question) => question.subject === subject);
+              const subjectAnswered = subjectQuestions.filter((question) => attempt.answers[question.id]).length;
+              return (
+                <button
+                  className={subject === currentQuestion.subject ? "active" : ""}
+                  key={subject}
+                  onClick={() => setCurrentIndex(exam.questions.findIndex((question) => question.subject === subject))}
+                  type="button"
+                >
+                  <span>{subject}</span>
+                  <small>{subjectAnswered}/{subjectQuestions.length}</small>
+                </button>
+              );
+            })}
+          </div>
           <div className="question-meta">
             <span>Sual {currentQuestion.number} / {exam.questionCount}</span>
             <span>{currentQuestion.subject} · {subjectQuestionNumber}</span>
           </div>
           <h1>{currentQuestion.text}</h1>
+          {currentQuestion.questionImageUrl && (
+            <div className="question-image">
+              <Image
+                src={currentQuestion.questionImageUrl}
+                alt="Sualın rəsmi diaqramı"
+                width={currentQuestion.questionImageWidth ?? 511}
+                height={currentQuestion.questionImageHeight ?? 400}
+                priority={false}
+              />
+            </div>
+          )}
 
           <div className="options" role="radiogroup" aria-label="Cavab variantları">
             {currentQuestion.options.map((option) => {
