@@ -40,6 +40,7 @@ export function gradeMultipleChoice(
     selectedOptionId: selectedOption?.id ?? null,
     selectedKey: selectedOption?.key ?? null,
     correctKey: correctOption.key,
+    status: !selectedOption ? "unanswered" : isCorrect ? "correct" : "wrong",
     isCorrect,
     awardedScore: isCorrect ? question.maxScore : 0,
     maxScore: question.maxScore,
@@ -85,10 +86,58 @@ export function gradeExam(
   answers: AnswerMap,
   attemptId: string,
   startedAt: string,
+  solutionImagePaths: Record<string, string> = {},
 ): AttemptResult {
-  const gradedAnswers = exam.questions.map((question) =>
-    gradeMultipleChoice(question, answers[question.id]),
-  );
+  const gradedAnswers = exam.questions.map((question) => {
+    const studentAnswer = answers[question.id] ?? "";
+    const solutionImagePath = solutionImagePaths[question.id] ?? null;
+    if (question.type === "multiple_choice") {
+      return gradeMultipleChoice(question, studentAnswer || undefined);
+    }
+
+    const accepted = question.type === "short_answer"
+      ? matchAcceptedAnswer(studentAnswer, question.acceptedAnswers ?? [])
+      : null;
+    const maxScore = question.type === "short_answer"
+      ? question.officialRubric?.maxScore ?? Math.max(0, ...(question.acceptedAnswers ?? []).map((answer) => answer.score))
+      : question.officialRubric?.maxScore ?? 0;
+
+    if (accepted) {
+      const isCorrect = maxScore > 0 && accepted.score === maxScore;
+      return {
+        questionId: question.id,
+        questionNumber: question.number,
+        selectedOptionId: null,
+        selectedKey: null,
+        correctKey: null,
+        selectedAnswerText: studentAnswer,
+        solutionImagePath,
+        status: isCorrect ? "correct" as const : "wrong" as const,
+        isCorrect,
+        awardedScore: accepted.score,
+        maxScore,
+        subject: question.subject,
+        topic: question.topic,
+      };
+    }
+
+    const unanswered = !studentAnswer.trim() && !solutionImagePath;
+    return {
+      questionId: question.id,
+      questionNumber: question.number,
+      selectedOptionId: null,
+      selectedKey: null,
+      correctKey: null,
+      selectedAnswerText: studentAnswer || null,
+      solutionImagePath,
+      status: unanswered ? "unanswered" as const : "ungraded" as const,
+      isCorrect: null,
+      awardedScore: 0,
+      maxScore: 0,
+      subject: question.subject,
+      topic: question.topic,
+    };
+  });
   const totals = calculateExamScore(gradedAnswers);
   const durationSeconds = Math.max(
     0,

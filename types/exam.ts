@@ -10,6 +10,7 @@ export type QuestionType =
   | "multiple_choice"
   | "short_answer"
   | "constructed_response"
+  | "handwritten_solution"
   | "table"
   | "essay"
   | "listening"
@@ -29,14 +30,28 @@ export type ExamQuestion = {
   topic: string;
   type: QuestionType;
   text: string;
+  textLatex?: string;
   options: QuestionOption[];
   maxScore: number;
+  acceptedAnswers?: Array<{ answerText: string; normalizedAnswer?: string | null; score: number }>;
+  officialRubric?: { maxScore: number; allowedScores: number[]; officialText?: string };
+  officialAnswer?: string;
   officialExplanation?: string;
   questionImageUrl?: string;
   questionImageWidth?: number;
   questionImageHeight?: number;
   variantNumbers?: Record<"A" | "B" | "C" | "D", number>;
   sourcePage?: number;
+  passageId?: string;
+  audioUrl?: string;
+};
+
+export type ExamPassage = {
+  id: string;
+  title: string;
+  text?: string;
+  imageUrl?: string;
+  sortOrder: number;
 };
 
 export type Exam = {
@@ -51,6 +66,8 @@ export type Exam = {
   languageSection: "AZ" | "RU";
   durationMinutes?: number;
   subjects: string[];
+  subjectOrder?: string[];
+  passages?: ExamPassage[];
   questionCount: number;
   maxScore: number;
   status: "demo" | "draft" | "published";
@@ -68,8 +85,11 @@ export type GradedAnswer = {
   questionNumber: number;
   selectedOptionId: string | null;
   selectedKey: string | null;
-  correctKey: string;
-  isCorrect: boolean;
+  correctKey: string | null;
+  selectedAnswerText?: string | null;
+  solutionImagePath?: string | null;
+  status: "correct" | "wrong" | "unanswered" | "ungraded";
+  isCorrect: boolean | null;
   awardedScore: number;
   maxScore: number;
   subject: string;

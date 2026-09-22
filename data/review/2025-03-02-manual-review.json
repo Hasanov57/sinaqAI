@@ -1,0 +1,65 @@
+{
+  "exam_dataset_key": "2025-03-02-graduation-11-az-incomplete",
+  "source_document": "data/raw/izah.pdf",
+  "review_status": "incomplete",
+  "reviewed_scope": "All non-listening questions in the Azerbaijani-language version: English 7-30, Azərbaycan dili 31-60, Riyaziyyat 61-85.",
+  "verified_question_counts": {
+    "İngilis dili": 24,
+    "Azərbaycan dili": 30,
+    "Riyaziyyat": 25,
+    "total": 79
+  },
+  "skipped_question_count": 6,
+  "pages_remaining_unresolved": [1, 2],
+  "skipped_questions": [
+    {
+      "pdf_page": 1,
+      "subject": "İngilis dili",
+      "question_number": 1,
+      "reason": "Listening question; the audio stimulus is not included in the explanation PDF, so the task cannot be completed from its text alone.",
+      "recommended_manual_action": "Obtain the official audio for the 2 March 2025 DİM exam, verify the recording and answer against the official explanation, then add the question and audio reference."
+    },
+    {
+      "pdf_page": 1,
+      "subject": "İngilis dili",
+      "question_number": 2,
+      "reason": "Listening question; the audio stimulus is not included in the explanation PDF, so the task cannot be completed from its text alone.",
+      "recommended_manual_action": "Obtain the official audio for the 2 March 2025 DİM exam, verify the recording and answer against the official explanation, then add the question and audio reference."
+    },
+    {
+      "pdf_page": 1,
+      "subject": "İngilis dili",
+      "question_number": 3,
+      "reason": "Listening question; the audio stimulus is not included in the explanation PDF, so the task cannot be completed from its text alone.",
+      "recommended_manual_action": "Obtain the official audio for the 2 March 2025 DİM exam, verify the recording and answer against the official explanation, then add the question and audio reference."
+    },
+    {
+      "pdf_page": 2,
+      "subject": "İngilis dili",
+      "question_number": 4,
+      "reason": "Listening question; the audio stimulus is not included in the explanation PDF, so the task cannot be completed from its text alone.",
+      "recommended_manual_action": "Obtain the official audio for the 2 March 2025 DİM exam, verify the recording and answer against the official explanation, then add the question and audio reference."
+    },
+    {
+      "pdf_page": 2,
+      "subject": "İngilis dili",
+      "question_number": 5,
+      "reason": "Listening question; the audio stimulus is not included in the explanation PDF, so the task cannot be completed from its text alone.",
+      "recommended_manual_action": "Obtain the official audio for the 2 March 2025 DİM exam, verify the recording and answer against the official explanation, then add the question and audio reference."
+    },
+    {
+      "pdf_page": 2,
+      "subject": "İngilis dili",
+      "question_number": 6,
+      "reason": "Listening question; the audio stimulus is not included in the explanation PDF, so the task cannot be completed from its text alone.",
+      "recommended_manual_action": "Obtain the official audio for the 2 March 2025 DİM exam, verify the recording and answer against the official explanation, then add the question and audio reference."
+    }
+  ],
+  "out_of_scope_sections": [
+    {
+      "pdf_pages": "21-47",
+      "reason": "These pages contain alternative Russian and other language versions of the exam, not additional questions in the requested English, Azərbaycan dili, and Riyaziyyat sections of the AZ-language booklet.",
+      "recommended_manual_action": "No action for this dataset. Import only if a separate language-version dataset is requested."
+    }
+  ]
+}

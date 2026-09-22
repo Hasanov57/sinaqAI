@@ -41,9 +41,9 @@ export default async function ExamDetailPage({ params }: Props) {
             <div className="notice">
               <Info size={20} />
               <div>
-                <strong>{exam.status === "draft" ? "Məhdud test dataseti" : "Demo məlumatı"}</strong><br />
+                <strong>{exam.status === "draft" ? "Natamam rəsmi imtahan dataseti" : "Demo məlumatı"}</strong><br />
                 {exam.status === "draft"
-                  ? "Suallar DİM-in rəsmi izah PDF-indən götürülüb, lakin bu 15 suallıq seçim tam imtahan deyil. PDF-də rəsmi bal qaydası göstərilmədiyi üçün yalnız düzgün cavab sayı hesablanır."
+                  ? `${exam.questionCount} qeyri-dinləmə sualı rəsmi izah PDF-indən götürülüb. 6 dinləmə sualı və audio hələ əlavə edilməyib; imtahan tam kimi təqdim olunmur. Rəsmi bal qaydası olmadığından yalnız çoxseçimli suallar avtomatik yoxlanılır.`
                   : "Bu imtahan platformanın iş prinsipini göstərmək üçün hazırlanıb və rəsmi DİM imtahanı deyil."}
               </div>
             </div>
@@ -63,7 +63,7 @@ export default async function ExamDetailPage({ params }: Props) {
             <div className="side-notes">
               <span><Clock3 size={17} /> {exam.durationMinutes ? "Vaxt göstəricisi aktivdir" : "Keçən vaxt göstərilir"}</span>
               <span><CheckCircle2 size={17} /> Cavablar cihazda saxlanır</span>
-              <span><Languages size={17} /> Azərbaycan dili bölməsi</span>
+              <span><Languages size={17} /> Azərbaycan bölməsi</span>
               <span><ShieldCheck size={17} /> Yoxlama qayda əsaslıdır</span>
             </div>
           </aside>

@@ -9,6 +9,7 @@ function answer(topic: string, correct: boolean): GradedAnswer {
     selectedOptionId: "option",
     selectedKey: "A",
     correctKey: correct ? "A" : "B",
+    status: correct ? "correct" : "wrong",
     isCorrect: correct,
     awardedScore: correct ? 1 : 0,
     maxScore: 1,

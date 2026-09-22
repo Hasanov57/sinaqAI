@@ -1,22 +1,78 @@
 import officialDataset from "../../data/exams/2025-03-02-graduation-11-az.json";
 import type { Exam, ExamQuestion, QuestionType } from "../../types/exam";
 
-type DatasetQuestion = (typeof officialDataset.questions)[number];
+type DatasetQuestion = (typeof officialDataset.questions)[number] & {
+  question_text_latex?: string | null;
+  passage_id?: string | null;
+  audio_url?: string | null;
+  accepted_answers?: Array<{ answer_text: string; normalized_answer?: string | null; score: number }>;
+  official_rubric?: { max_score: number; allowed_scores: number[]; official_text?: string };
+  official_answer?: string;
+};
+type DatasetPassage = {
+  canonical_id: string;
+  subject: string;
+  title: string;
+  passage_text?: string | null;
+  passage_image_url?: string | null;
+  sort_order: number;
+};
+const questionImageSizes: Record<string, { width: number; height: number }> = {
+  "/exam-assets/2025-03-02/math-002.png": { width: 511, height: 400 },
+  "/exam-assets/2025-03-02/az-034-syntax-options.png": { width: 744, height: 445 },
+  "/exam-assets/2025-03-02/az-051-causes-question.png": { width: 700, height: 394 },
+  "/exam-assets/2025-03-02/az-052-expansion-question.png": { width: 580, height: 600 },
+  "/exam-assets/2025-03-02/az-053-theses-question.png": { width: 622, height: 544 },
+  "/exam-assets/2025-03-02/az-054-true-false-table.png": { width: 582, height: 555 },
+  "/exam-assets/2025-03-02/az-055-comparison-question.png": { width: 580, height: 377 },
+  "/exam-assets/2025-03-02/az-058-venn-diagram.png": { width: 622, height: 411 },
+  "/exam-assets/2025-03-02/az-059-meaning-table.png": { width: 571, height: 466 },
+  "/exam-assets/2025-03-02/az-060-problem-solution-table.png": { width: 622, height: 1166 },
+  "/exam-assets/2025-03-02/math-066-probability-chart.png": { width: 744, height: 912 },
+  "/exam-assets/2025-03-02/math-067-circle-diagram.png": { width: 744, height: 482 },
+  "/exam-assets/2025-03-02/math-081-garden-diagram.png": { width: 744, height: 612 },
+  "/exam-assets/2025-03-02/math-083-trapezoid-diagram.png": { width: 744, height: 457 },
+  "/exam-assets/2025-03-02/math-085-function-graph.png": { width: 744, height: 672 },
+};
+const dataset = officialDataset as unknown as {
+  passages?: DatasetPassage[];
+  exam: (typeof officialDataset.exam) & { subject_order: string[] };
+  questions: DatasetQuestion[];
+};
 
-function mapQuestion(question: DatasetQuestion, index: number): ExamQuestion {
+function mapQuestion(question: DatasetQuestion): ExamQuestion {
+  const imageSize = question.question_image_url
+    ? questionImageSizes[question.question_image_url]
+    : undefined;
   return {
     id: question.canonical_id,
-    number: index + 1,
+    number: 0,
     subject: question.subject,
     topic: question.topic,
     type: question.question_type as QuestionType,
     text: question.question_text,
+    textLatex: question.question_text_latex ?? undefined,
     questionImageUrl: question.question_image_url ?? undefined,
-    questionImageWidth: question.question_image_url ? 511 : undefined,
-    questionImageHeight: question.question_image_url ? 400 : undefined,
+    questionImageWidth: imageSize?.width,
+    questionImageHeight: imageSize?.height,
     variantNumbers: question.variant_numbers,
     sourcePage: question.source_page,
-    options: question.options.map((option) => ({
+    passageId: question.passage_id ?? undefined,
+    audioUrl: question.audio_url ?? undefined,
+    acceptedAnswers: question.accepted_answers?.map((answer) => ({
+      answerText: answer.answer_text,
+      normalizedAnswer: answer.normalized_answer ?? null,
+      score: answer.score,
+    })),
+    officialRubric: question.official_rubric
+      ? {
+          maxScore: question.official_rubric.max_score,
+          allowedScores: question.official_rubric.allowed_scores,
+          officialText: question.official_rubric.official_text,
+        }
+      : undefined,
+    officialAnswer: question.official_answer ?? undefined,
+    options: (question.options ?? []).map((option) => ({
       id: `${question.canonical_id}-${option.key.toLowerCase()}`,
       key: option.key,
       text: option.text,
@@ -24,27 +80,48 @@ function mapQuestion(question: DatasetQuestion, index: number): ExamQuestion {
     })),
     // The explanation PDF does not state a point value. The runtime value is
     // used only to count correct answers and is never presented as official bal.
-    maxScore: 1,
+    maxScore: question.max_score ?? question.official_rubric?.max_score ?? (question.question_type === "multiple_choice" ? 1 : 0),
     officialExplanation: question.official_explanation,
   };
 }
 
+const subjectOrder = dataset.exam.subject_order;
+const orderedQuestions = [...dataset.questions]
+  .sort((left, right) => {
+    const leftIndex = subjectOrder.indexOf(left.subject);
+    const rightIndex = subjectOrder.indexOf(right.subject);
+    const subjectDifference = (leftIndex < 0 ? Number.MAX_SAFE_INTEGER : leftIndex) -
+      (rightIndex < 0 ? Number.MAX_SAFE_INTEGER : rightIndex);
+    if (subjectDifference !== 0) return subjectDifference;
+    return (left.variant_numbers?.A ?? Number.MAX_SAFE_INTEGER) -
+      (right.variant_numbers?.A ?? Number.MAX_SAFE_INTEGER);
+  })
+  .map((question, index) => ({ ...mapQuestion(question), number: index + 1 }));
+
 export const officialTestExam: Exam = {
-  id: officialDataset.exam.dataset_key,
-  title: officialDataset.exam.title,
-  year: Number(officialDataset.exam.date.slice(0, 4)),
-  date: officialDataset.exam.date,
-  type: officialDataset.exam.type as Exam["type"],
+  id: dataset.exam.dataset_key,
+  title: dataset.exam.title,
+  year: Number(dataset.exam.date.slice(0, 4)),
+  date: dataset.exam.date,
+  type: dataset.exam.type as Exam["type"],
   typeLabel: "11-ci sinif buraxılış",
-  grade: officialDataset.exam.grade,
-  languageSection: officialDataset.exam.language_section as "AZ",
-  subjects: ["Azərbaycan dili", "Riyaziyyat", "İngilis dili"],
-  questionCount: officialDataset.questions.length,
-  maxScore: officialDataset.questions.length,
+  grade: dataset.exam.grade,
+  languageSection: dataset.exam.language_section as "AZ",
+  subjects: subjectOrder,
+  subjectOrder,
+  passages: (dataset.passages ?? []).map((passage) => ({
+    id: passage.canonical_id,
+    title: passage.title,
+    text: passage.passage_text ?? undefined,
+    imageUrl: passage.passage_image_url ?? undefined,
+    sortOrder: passage.sort_order,
+  })),
+  questionCount: dataset.questions.length,
+  maxScore: dataset.questions.length,
   status: "draft",
-  sourceUrl: officialDataset.exam.official_source_url,
-  sourceOrganization: officialDataset.exam.source_organization,
-  datasetLabel: officialDataset.exam.dataset_label,
+  sourceUrl: dataset.exam.official_source_url,
+  sourceOrganization: dataset.exam.source_organization,
+  datasetLabel: dataset.exam.dataset_label,
   usesOfficialScoring: false,
-  questions: officialDataset.questions.map(mapQuestion),
+  questions: orderedQuestions,
 };

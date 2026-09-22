@@ -15,6 +15,7 @@ export function calculateTopicStatistics(
   const grouped = new Map<string, Omit<TopicStatistic, "accuracyPercentage">>();
 
   for (const answer of answers) {
+    if (answer.status === "ungraded") continue;
     const current = grouped.get(answer.topic) ?? {
       topic: answer.topic,
       questionsSeen: 0,

@@ -13,6 +13,7 @@ export const demoExams: Exam[] = [
     languageSection: "AZ",
     durationMinutes: 45,
     subjects: ["Azərbaycan dili", "Riyaziyyat", "İngilis dili"],
+    subjectOrder: ["Azərbaycan dili", "Riyaziyyat", "İngilis dili"],
     questionCount: 6,
     maxScore: 6,
     status: "demo",
