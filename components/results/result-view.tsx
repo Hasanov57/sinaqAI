@@ -1,10 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Check, ChevronDown, CircleDashed, Clock3, RotateCcw, Sparkles, X } from "lucide-react";
 import { calculateTopicStatistics } from "@/lib/analytics/statistics";
+import { syncOfficialAttempt } from "@/lib/attempts/client";
+import { aiReturnPath, loginPath } from "@/lib/auth/return-path";
+import { getPendingAiIntent } from "@/lib/auth/pending-ai";
+import type { QuestionExplanation } from "@/lib/ai/schema";
 import { getExam } from "@/lib/data/demo-exams";
+import { createSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase/browser";
 import type { AttemptResult } from "@/types/exam";
 
 function formatDuration(seconds: number) {
@@ -16,13 +21,24 @@ function formatDuration(seconds: number) {
 export function ResultView({ attemptId }: { attemptId: string }) {
   const [result, setResult] = useState<AttemptResult | null>(null);
   const [loaded, setLoaded] = useState(false);
-  const [aiState, setAiState] = useState<Record<string, { loading?: boolean; explanation?: string; error?: string }>>({});
+  const [aiState, setAiState] = useState<Record<string, { loading?: boolean; explanation?: QuestionExplanation; error?: string }>>({});
+  const [syncWarning, setSyncWarning] = useState("");
+  const pendingConsumed = useRef(false);
 
   useEffect(() => {
-    const hydrationTask = window.setTimeout(() => {
+    const hydrationTask = window.setTimeout(async () => {
       const raw = window.localStorage.getItem(`sinaqai:result:${attemptId}`);
       if (raw) {
         try { setResult(JSON.parse(raw) as AttemptResult); } catch { setResult(null); }
+      } else if (isSupabaseConfigured()) {
+        const response = await fetch(`/api/attempts/${encodeURIComponent(attemptId)}`).catch(() => null);
+        if (response?.ok) {
+          const payload = await response.json() as { result?: AttemptResult };
+          if (payload.result) {
+            setResult(payload.result);
+            window.localStorage.setItem(`sinaqai:result:${attemptId}`, JSON.stringify(payload.result));
+          }
+        }
       }
       setLoaded(true);
     }, 0);
@@ -51,6 +67,78 @@ export function ResultView({ attemptId }: { attemptId: string }) {
     return [...subjects.entries()];
   }, [result]);
 
+  const explainWrongAnswer = useCallback(async (questionId: string, automatic = false) => {
+    if (!result) return;
+    if (!isSupabaseConfigured()) {
+      setAiState((state) => ({ ...state, [questionId]: { error: "AI xidməti hazırda aktiv deyil." } }));
+      return;
+    }
+    setAiState((state) => ({ ...state, [questionId]: { loading: true } }));
+    try {
+      const { data: { user } } = await createSupabaseBrowserClient().auth.getUser();
+      if (!user) {
+        if (automatic) {
+          setAiState((state) => ({ ...state, [questionId]: { error: "İzah üçün hesabınıza daxil olun." } }));
+        } else {
+          window.location.assign(loginPath(aiReturnPath(attemptId, questionId)));
+        }
+        return;
+      }
+      await syncOfficialAttempt(result);
+      setSyncWarning("");
+      const response = await fetch("/api/ai/explain", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ attemptId: result.attemptId, questionId }),
+      });
+      const payload = await response.json() as { explanation?: QuestionExplanation; error?: string };
+      if (!response.ok || !payload.explanation) throw new Error(payload.error ?? "AI izahını hazırda yaratmaq mümkün olmadı. Bir az sonra yenidən cəhd edin.");
+      setAiState((state) => ({ ...state, [questionId]: { explanation: payload.explanation } }));
+    } catch (error) {
+      setAiState((state) => ({ ...state, [questionId]: { error: error instanceof Error ? error.message : "AI izahını hazırda yaratmaq mümkün olmadı. Bir az sonra yenidən cəhd edin." } }));
+    }
+  }, [attemptId, result]);
+
+  useEffect(() => {
+    if (!loaded || !result || getExam(result.examId)?.status === "demo") return;
+    const pending = new URLSearchParams(window.location.search).get("aiExplain");
+    if (pending || !isSupabaseConfigured()) return;
+    let active = true;
+    void (async () => {
+      const { data: { user } } = await createSupabaseBrowserClient().auth.getUser();
+      if (!user || !active) return;
+      try {
+        await syncOfficialAttempt(result);
+        if (!active) return;
+        window.localStorage.removeItem(`sinaqai:sync-error:${attemptId}`);
+        setSyncWarning("");
+        const response = await fetch(`/api/ai/explain?attemptId=${encodeURIComponent(attemptId)}`);
+        if (response.ok) {
+          const payload = await response.json() as { explanations: Record<string, QuestionExplanation> };
+          if (active) setAiState((current) => ({
+            ...current,
+            ...Object.fromEntries(Object.entries(payload.explanations).map(([id, explanation]) => [id, { explanation }])),
+          }));
+        }
+      } catch {
+        if (active) setSyncWarning("Nəticə hesabınıza saxlanmadı. Bu səhifəni yeniləyib yenidən cəhd edin.");
+      }
+    })();
+    return () => { active = false; };
+  }, [attemptId, loaded, result]);
+
+  useEffect(() => {
+    if (!loaded || !result || pendingConsumed.current) return;
+    const intent = getPendingAiIntent(window.location.href,
+      result.answers.filter((answer) => answer.status === "wrong").map((answer) => answer.questionId));
+    if (!intent) return;
+    const { questionId } = intent;
+    pendingConsumed.current = true;
+    window.history.replaceState(null, "", intent.cleanPath);
+    const card = document.getElementById(`question-${questionId}`) as HTMLDetailsElement | null;
+    if (card) { card.open = true; card.scrollIntoView({ block: "center" }); }
+    void explainWrongAnswer(questionId, true);
+  }, [explainWrongAnswer, loaded, result]);
+
   if (!loaded) return <div className="runner-loading">Nəticə hesablanır…</div>;
 
   if (!result || !exam) {
@@ -58,7 +146,7 @@ export function ResultView({ attemptId }: { attemptId: string }) {
       <section className="section">
         <div className="narrow empty-state">
           <h1>Nəticə tapılmadı</h1>
-          <p>Bu nəticə yalnız imtahanı həll etdiyiniz cihazda saxlanılır.</p>
+          <p>Nəticə tapılmadı. Hesabınıza daxil olun və ya imtahanı həll etdiyiniz cihazdan yenidən yoxlayın.</p>
           <Link className="button" href="/exams">İmtahanlara qayıt</Link>
         </div>
       </section>
@@ -70,23 +158,6 @@ export function ResultView({ attemptId }: { attemptId: string }) {
   const unanswered = result.answers.filter((answer) => answer.status === "unanswered").length;
   const ungraded = result.answers.filter((answer) => answer.status === "ungraded").length;
   const wrong = result.answers.filter((answer) => answer.status === "wrong").length;
-  const resultExamId = result.examId;
-
-  async function explainWrongAnswer(questionId: string, selectedKey: string) {
-    setAiState((state) => ({ ...state, [questionId]: { loading: true } }));
-    try {
-      const response = await fetch("/api/ai/explain", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ examId: resultExamId, questionId, selectedKey }),
-      });
-      const payload = await response.json() as { explanation?: string; error?: string };
-      if (!response.ok || !payload.explanation) throw new Error(payload.error ?? "İzah alınmadı.");
-      setAiState((state) => ({ ...state, [questionId]: { explanation: payload.explanation } }));
-    } catch (error) {
-      setAiState((state) => ({ ...state, [questionId]: { error: error instanceof Error ? error.message : "İzah alınmadı." } }));
-    }
-  }
 
   return (
     <>
@@ -112,6 +183,7 @@ export function ResultView({ attemptId }: { attemptId: string }) {
 
       <section className="section result-section">
         <div className="shell">
+          {syncWarning && <p className="sync-warning" role="alert">{syncWarning}</p>}
           <div className="summary-grid">
             <article className="summary-card summary-correct"><Check size={21} /><div><strong>{correct}</strong><span>Düzgün</span></div></article>
             <article className="summary-card summary-wrong"><X size={21} /><div><strong>{wrong}</strong><span>Səhv</span></div></article>
@@ -157,8 +229,9 @@ export function ResultView({ attemptId }: { attemptId: string }) {
                 if (!question) return null;
                 const statusClass = answer.status === "correct" ? "review-correct" : answer.status === "wrong" ? "review-wrong" : answer.status === "ungraded" ? "review-ungraded" : "review-unanswered";
                 const statusLabel = answer.status === "correct" ? "Düzgün" : answer.status === "wrong" ? "Səhv" : answer.status === "ungraded" ? "Yoxlanılmayıb" : "Cavabsız";
+                const explanation = aiState[question.id]?.explanation;
                 return (
-                  <details className={`review-card ${statusClass}`} key={answer.questionId}>
+                  <details className={`review-card ${statusClass}`} id={`question-${answer.questionId}`} key={answer.questionId}>
                     <summary>
                       <span className="review-status">{answer.status === "correct" ? <Check size={18} /> : answer.status === "wrong" ? <X size={18} /> : <CircleDashed size={18} />}</span>
                       <div><strong>Sual {answer.questionNumber}</strong><span>{answer.topic}</span></div>
@@ -173,28 +246,32 @@ export function ResultView({ attemptId }: { attemptId: string }) {
                       </div>
                       {question.officialExplanation && (
                         <div className="official-explanation">
-                          <strong>{exam.status === "draft" ? "DİM rəsmi izahı" : "Demo izahı"}</strong>
+                          <strong>{exam.status === "draft" ? "DİM izahı" : "Demo izahı"}</strong>
                           <p>{question.officialExplanation}</p>
                           {question.sourcePage && <small>Mənbə səhifəsi: {question.sourcePage}</small>}
                         </div>
                       )}
-                      {answer.status === "wrong" && question.type === "multiple_choice" && answer.selectedKey && (
+                      {exam.status === "draft" && answer.status === "wrong" && question.type === "multiple_choice" && answer.selectedKey && (
                         <div className="ai-explanation">
-                          {!aiState[question.id]?.explanation && (
+                          {!explanation && (
                             <button
                               className="button button-secondary"
                               type="button"
                               disabled={aiState[question.id]?.loading}
-                              onClick={() => void explainWrongAnswer(question.id, answer.selectedKey!)}
+                              onClick={() => void explainWrongAnswer(question.id)}
                             >
-                              <Sparkles size={17} /> {aiState[question.id]?.loading ? "İzah hazırlanır…" : "AI ilə izah et"}
+                              <Sparkles size={17} /> {aiState[question.id]?.loading ? "AI izah hazırlayır..." : "AI ilə izah et"}
                             </button>
                           )}
                           {aiState[question.id]?.error && <p role="alert">{aiState[question.id].error}</p>}
-                          {aiState[question.id]?.explanation && (
+                          {explanation && (
                             <div className="official-explanation ai-explanation-content">
-                              <strong>AI izahı · rəsmi balı dəyişmir</strong>
-                              <p>{aiState[question.id].explanation}</p>
+                              <strong>AI izahı · DİM tərəfindən yazılmayıb</strong>
+                              <p>{explanation.summary}</p>
+                              <h4>Səhvin səbəbi</h4><p>{explanation.whyWrong}</p>
+                              <h4>Doğru yanaşma</h4><p>{explanation.correctReasoning}</p>
+                              <h4>Yadda saxla</h4><p>{explanation.keyRule}</p>
+                              {explanation.miniExample && <><h4>Oxşar nümunə</h4><p>{explanation.miniExample}</p></>}
                             </div>
                           )}
                         </div>

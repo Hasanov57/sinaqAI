@@ -1,4 +1,5 @@
 import officialDataset from "../../data/exams/2025-03-02-graduation-11-az.json";
+import { stripDimSourceHeader } from "./sanitize-dim";
 import type { Exam, ExamQuestion, QuestionType } from "../../types/exam";
 
 type DatasetQuestion = (typeof officialDataset.questions)[number] & {
@@ -41,6 +42,7 @@ const dataset = officialDataset as unknown as {
 };
 
 function mapQuestion(question: DatasetQuestion): ExamQuestion {
+  const sanitized = stripDimSourceHeader(question.question_text);
   const imageSize = question.question_image_url
     ? questionImageSizes[question.question_image_url]
     : undefined;
@@ -50,12 +52,12 @@ function mapQuestion(question: DatasetQuestion): ExamQuestion {
     subject: question.subject,
     topic: question.topic,
     type: question.question_type as QuestionType,
-    text: question.question_text,
+    text: sanitized.text,
     textLatex: question.question_text_latex ?? undefined,
     questionImageUrl: question.question_image_url ?? undefined,
     questionImageWidth: imageSize?.width,
     questionImageHeight: imageSize?.height,
-    variantNumbers: question.variant_numbers,
+    variantNumbers: question.variant_numbers ?? sanitized.sourceVariantNumbers ?? undefined,
     sourcePage: question.source_page,
     passageId: question.passage_id ?? undefined,
     audioUrl: question.audio_url ?? undefined,
@@ -85,6 +87,18 @@ function mapQuestion(question: DatasetQuestion): ExamQuestion {
   };
 }
 
+function mapPassage(passage: DatasetPassage) {
+  const sanitized = stripDimSourceHeader(passage.passage_text ?? "");
+  return {
+    id: passage.canonical_id,
+    title: passage.title,
+    text: sanitized.text || undefined,
+    imageUrl: passage.passage_image_url ?? undefined,
+    sortOrder: passage.sort_order,
+    sourceVariantNumbers: sanitized.sourceVariantNumbers ?? undefined,
+  };
+}
+
 const subjectOrder = dataset.exam.subject_order;
 const orderedQuestions = [...dataset.questions]
   .sort((left, right) => {
@@ -109,13 +123,7 @@ export const officialTestExam: Exam = {
   languageSection: dataset.exam.language_section as "AZ",
   subjects: subjectOrder,
   subjectOrder,
-  passages: (dataset.passages ?? []).map((passage) => ({
-    id: passage.canonical_id,
-    title: passage.title,
-    text: passage.passage_text ?? undefined,
-    imageUrl: passage.passage_image_url ?? undefined,
-    sortOrder: passage.sort_order,
-  })),
+  passages: (dataset.passages ?? []).map(mapPassage),
   questionCount: dataset.questions.length,
   maxScore: dataset.questions.length,
   status: "draft",

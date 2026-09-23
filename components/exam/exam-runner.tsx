@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { Check, ChevronLeft, ChevronRight, Clock3, Flag, Menu, Save, X } from "lucide-react";
 import { gradeExam } from "@/lib/grading/grading";
+import { syncOfficialAttempt } from "@/lib/attempts/client";
 import { createSolutionImagePath, validateSolutionImage } from "@/lib/storage/solution-images";
 import { createSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase/browser";
 import type { AnswerMap, Exam } from "@/types/exam";
@@ -34,6 +35,7 @@ export function ExamRunner({ exam }: { exam: Exam }) {
   const [solutionMessages, setSolutionMessages] = useState<Record<string, string>>({});
   const [uploadingQuestionId, setUploadingQuestionId] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const storageKey = `sinaqai:active:${exam.id}`;
 
   useEffect(() => {
@@ -176,10 +178,21 @@ export function ExamRunner({ exam }: { exam: Exam }) {
     setPassageExpanded(true);
   }
 
-  function submitExam() {
-    if (!attempt) return;
+  async function submitExam() {
+    if (!attempt || submitting) return;
+    setSubmitting(true);
     const result = gradeExam(exam, attempt.answers, attempt.attemptId, attempt.startedAt, attempt.solutionImagePaths);
     window.localStorage.setItem(`sinaqai:result:${attempt.attemptId}`, JSON.stringify(result));
+    if (exam.status === "draft" && isSupabaseConfigured()) {
+      const { data: { user } } = await createSupabaseBrowserClient().auth.getUser();
+      if (user) {
+        try {
+          await syncOfficialAttempt(result);
+        } catch {
+          window.localStorage.setItem(`sinaqai:sync-error:${attempt.attemptId}`, "1");
+        }
+      }
+    }
     window.localStorage.removeItem(storageKey);
     router.push(`/results/${attempt.attemptId}`);
   }
@@ -402,7 +415,7 @@ export function ExamRunner({ exam }: { exam: Exam }) {
             <p>{exam.questionCount - answeredCount} sual cavabsız qalıb. Təsdiqdən sonra cavablar dəyişdirilə bilməz.</p>
             <div className="modal-actions">
               <button className="button button-secondary" onClick={() => setShowConfirm(false)} type="button">Davam et</button>
-              <button className="button button-danger" onClick={submitExam} type="button">Bitir və nəticəni göstər</button>
+              <button className="button button-danger" disabled={submitting} onClick={() => void submitExam()} type="button">{submitting ? "Nəticə saxlanır…" : "Bitir və nəticəni göstər"}</button>
             </div>
           </div>
         </div>

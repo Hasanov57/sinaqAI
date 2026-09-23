@@ -40,7 +40,7 @@ export type ExamQuestion = {
   questionImageUrl?: string;
   questionImageWidth?: number;
   questionImageHeight?: number;
-  variantNumbers?: Record<"A" | "B" | "C" | "D", number>;
+  variantNumbers?: Partial<Record<"A" | "B" | "C" | "D", number>>;
   sourcePage?: number;
   passageId?: string;
   audioUrl?: string;
@@ -52,6 +52,7 @@ export type ExamPassage = {
   text?: string;
   imageUrl?: string;
   sortOrder: number;
+  sourceVariantNumbers?: Partial<Record<"A" | "B" | "C" | "D", number>>;
 };
 
 export type Exam = {

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { gradeExam } from "../grading/grading";
 import { officialTestExam } from "./official-exams";
+import { stripDimSourceHeader } from "./sanitize-dim";
 
 describe("official 79-question incomplete test dataset", () => {
   it("uses the official subject sequence and sequential student numbering", () => {
@@ -63,5 +64,14 @@ describe("official 79-question incomplete test dataset", () => {
     expect(result.score).toBe(multipleChoice.length);
     expect(result.answers.filter((answer) => answer.status === "correct")).toHaveLength(multipleChoice.length);
     expect(result.answers.filter((answer) => answer.status === "unanswered")).toHaveLength(officialTestExam.questions.length - multipleChoice.length);
+  });
+
+  it("keeps booklet source headers out of all visible question and passage text", () => {
+    for (const text of [
+      ...officialTestExam.questions.map((question) => question.text),
+      ...(officialTestExam.passages ?? []).map((passage) => passage.text ?? ""),
+    ]) {
+      expect(stripDimSourceHeader(text).sourceVariantNumbers).toBeNull();
+    }
   });
 });
