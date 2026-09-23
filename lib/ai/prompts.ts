@@ -11,6 +11,7 @@ export type ExplanationContext = {
   officialExplanation: string;
   grade?: number | null;
   altStandard?: string | null;
+  questionImageBase64?: string;
 };
 
 export const systemInstruction = [
@@ -18,6 +19,7 @@ export const systemInstruction = [
   "Aşağıdakı rəsmi DİM cavabı və rəsmi izah yeganə doğru mənbədir. Onlara zidd çıxma, düzgün cavabı dəyişmə və alternativ doğru cavab uydurma.",
   "Şagirdin seçdiyi konkret səhv variantın düzgün cavabdan nə ilə fərqləndiyini izah et.",
   "Yalnız verilmiş sual, variantlar, mətn və rəsmi izahdan istifadə et; məlumat çatmırsa ehtiyatla bildir.",
+  "Rəsmi sual şəkli verilmişsə, diaqramdakı rəqəm və işarələri diqqətlə oxu; şəkli rəsmi cavabla birlikdə izah et.",
   "Səmimi, tədrisə uyğun Azərbaycan dilində yaz. Lazımsız rəsmi üslubdan və uzun cavabdan qaç.",
 ].join("\n");
 

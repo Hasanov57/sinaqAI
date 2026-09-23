@@ -20,6 +20,11 @@ const payloadSchema = z.object({
   answers: z.array(answerSchema).max(120),
 });
 
+function databaseFailure(stage: string, error: { code?: string; message?: string } | null, message: string) {
+  console.error("Official attempt sync failed", { stage, code: error?.code, message: error?.message });
+  return NextResponse.json({ error: message }, { status: 503 });
+}
+
 export async function POST(request: Request) {
   const origin = request.headers.get("origin");
   if (origin && origin !== new URL(request.url).origin) return NextResponse.json({ error: "Sorğu qəbul edilmir." }, { status: 403 });
@@ -45,10 +50,10 @@ export async function POST(request: Request) {
 
   const examResult = await admin.from("exams").select("id").eq("dataset_key", exam.id).maybeSingle();
   const examDbId = examResult.data?.id;
-  if (examResult.error || !examDbId) return NextResponse.json({ error: "İmtahan bazada tapılmadı." }, { status: 503 });
+  if (examResult.error || !examDbId) return databaseFailure("exam lookup", examResult.error, "İmtahan bazada tapılmadı.");
 
   const existing = await admin.from("exam_attempts").select("id,user_id,exam_id,status").eq("id", payload.attemptId).maybeSingle();
-  if (existing.error) return NextResponse.json({ error: "Cəhd yoxlanılmadı." }, { status: 503 });
+  if (existing.error) return databaseFailure("attempt lookup", existing.error, "Cəhd yoxlanılmadı.");
   if (existing.data && (existing.data.user_id !== user.id || existing.data.exam_id !== examDbId)) {
     return NextResponse.json({ error: "Bu cəhdə giriş yoxdur." }, { status: 403 });
   }
@@ -56,11 +61,11 @@ export async function POST(request: Request) {
 
   const questionsResult = await admin.from("questions").select("id,canonical_id").eq("exam_id", examDbId);
   if (questionsResult.error || !questionsResult.data || questionsResult.data.length !== exam.questions.length) {
-    return NextResponse.json({ error: "İmtahan sualları bazada tam deyil." }, { status: 503 });
+    return databaseFailure("question lookup", questionsResult.error, "İmtahan sualları bazada tam deyil.");
   }
   const questionIds = questionsResult.data.map((question) => question.id);
   const optionsResult = await admin.from("question_options").select("id,question_id,option_key").in("question_id", questionIds);
-  if (optionsResult.error || !optionsResult.data) return NextResponse.json({ error: "Cavab variantları yüklənmədi." }, { status: 503 });
+  if (optionsResult.error || !optionsResult.data) return databaseFailure("option lookup", optionsResult.error, "Cavab variantları yüklənmədi.");
   const questionDbIds = new Map(questionsResult.data.map((question) => [question.canonical_id, question.id]));
   const optionDbIds = new Map(optionsResult.data.map((option) => [`${option.question_id}:${option.option_key}`, option.id]));
 
@@ -93,7 +98,7 @@ export async function POST(request: Request) {
     const created = await admin.from("exam_attempts").insert({
       id: payload.attemptId, user_id: user.id, exam_id: examDbId, started_at: startedAt, status: "in_progress",
     });
-    if (created.error) return NextResponse.json({ error: "Cəhd saxlanmadı." }, { status: 503 });
+    if (created.error) return databaseFailure("attempt insert", created.error, "Cəhd saxlanmadı.");
   }
 
   const rows = graded.answers.filter((answer) => answer.status !== "unanswered").map((answer) => {
@@ -112,14 +117,14 @@ export async function POST(request: Request) {
   });
   if (rows.length) {
     const saved = await admin.from("student_answers").upsert(rows, { onConflict: "attempt_id,question_id" });
-    if (saved.error) return NextResponse.json({ error: "Cavablar saxlanmadı." }, { status: 503 });
+    if (saved.error) return databaseFailure("answers upsert", saved.error, "Cavablar saxlanmadı.");
   }
   const finalized = await admin.from("exam_attempts").update({
     status: "submitted", submitted_at: new Date().toISOString(), total_score: graded.score,
     max_score: graded.maxScore, duration_seconds: payload.durationSeconds,
   }).eq("id", payload.attemptId).eq("user_id", user.id).eq("status", "in_progress")
     .select("id").maybeSingle();
-  if (finalized.error) return NextResponse.json({ error: "Nəticə tamamlanmadı." }, { status: 503 });
+  if (finalized.error) return databaseFailure("attempt finalize", finalized.error, "Nəticə tamamlanmadı.");
   if (!finalized.data) return NextResponse.json({ error: "Nəticə tamamlanmadı. Səhifəni yeniləyib yenidən cəhd edin." }, { status: 409 });
   return NextResponse.json({ persisted: true });
 }

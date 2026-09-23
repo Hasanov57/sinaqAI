@@ -1,5 +1,12 @@
 import type { AttemptResult } from "@/types/exam";
 
+export class AttemptSyncError extends Error {
+  constructor(message: string, public readonly status: number) {
+    super(message);
+    this.name = "AttemptSyncError";
+  }
+}
+
 export async function syncOfficialAttempt(result: AttemptResult): Promise<void> {
   const response = await fetch("/api/attempts/sync", {
     method: "POST",
@@ -16,5 +23,11 @@ export async function syncOfficialAttempt(result: AttemptResult): Promise<void> 
       })),
     }),
   });
-  if (!response.ok) throw new Error("Nəticəni hesabınızda saxlamaq mümkün olmadı.");
+  if (!response.ok) {
+    const payload = await response.json().catch(() => null) as { error?: unknown } | null;
+    const message = typeof payload?.error === "string"
+      ? payload.error
+      : "Nəticəni hesabınızda saxlamaq mümkün olmadı. Bir az sonra yenidən cəhd edin.";
+    throw new AttemptSyncError(message, response.status);
+  }
 }

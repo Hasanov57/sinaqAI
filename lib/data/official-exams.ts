@@ -20,20 +20,20 @@ type DatasetPassage = {
 };
 const questionImageSizes: Record<string, { width: number; height: number }> = {
   "/exam-assets/2025-03-02/math-002.png": { width: 511, height: 400 },
-  "/exam-assets/2025-03-02/az-034-syntax-options.png": { width: 744, height: 445 },
+  "/exam-assets/2025-03-02/az-034-syntax-options.png": { width: 744, height: 285 },
   "/exam-assets/2025-03-02/az-051-causes-question.png": { width: 700, height: 394 },
-  "/exam-assets/2025-03-02/az-052-expansion-question.png": { width: 580, height: 600 },
-  "/exam-assets/2025-03-02/az-053-theses-question.png": { width: 622, height: 544 },
-  "/exam-assets/2025-03-02/az-054-true-false-table.png": { width: 582, height: 555 },
-  "/exam-assets/2025-03-02/az-055-comparison-question.png": { width: 580, height: 377 },
-  "/exam-assets/2025-03-02/az-058-venn-diagram.png": { width: 622, height: 411 },
+  "/exam-assets/2025-03-02/az-052-expansion-question.png": { width: 580, height: 569 },
+  "/exam-assets/2025-03-02/az-053-theses-question.png": { width: 622, height: 444 },
+  "/exam-assets/2025-03-02/az-054-true-false-table.png": { width: 582, height: 444 },
+  "/exam-assets/2025-03-02/az-055-comparison-question.png": { width: 580, height: 305 },
+  "/exam-assets/2025-03-02/az-058-venn-diagram.png": { width: 622, height: 221 },
   "/exam-assets/2025-03-02/az-059-meaning-table.png": { width: 571, height: 466 },
-  "/exam-assets/2025-03-02/az-060-problem-solution-table.png": { width: 622, height: 1166 },
-  "/exam-assets/2025-03-02/math-066-probability-chart.png": { width: 744, height: 912 },
-  "/exam-assets/2025-03-02/math-067-circle-diagram.png": { width: 744, height: 482 },
-  "/exam-assets/2025-03-02/math-081-garden-diagram.png": { width: 744, height: 612 },
-  "/exam-assets/2025-03-02/math-083-trapezoid-diagram.png": { width: 744, height: 457 },
-  "/exam-assets/2025-03-02/math-085-function-graph.png": { width: 744, height: 672 },
+  "/exam-assets/2025-03-02/az-060-problem-solution-table.png": { width: 622, height: 878 },
+  "/exam-assets/2025-03-02/math-066-probability-chart.png": { width: 744, height: 738 },
+  "/exam-assets/2025-03-02/math-067-circle-diagram.png": { width: 744, height: 325 },
+  "/exam-assets/2025-03-02/math-081-garden-diagram.png": { width: 744, height: 461 },
+  "/exam-assets/2025-03-02/math-083-trapezoid-diagram.png": { width: 744, height: 301 },
+  "/exam-assets/2025-03-02/math-085-function-graph.png": { width: 744, height: 530 },
 };
 const dataset = officialDataset as unknown as {
   passages?: DatasetPassage[];

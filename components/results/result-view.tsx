@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Check, ChevronDown, CircleDashed, Clock3, RotateCcw, Sparkles, X } from "lucide-react";
 import { calculateTopicStatistics } from "@/lib/analytics/statistics";
-import { syncOfficialAttempt } from "@/lib/attempts/client";
+import { AttemptSyncError, syncOfficialAttempt } from "@/lib/attempts/client";
 import { aiReturnPath, loginPath } from "@/lib/auth/return-path";
 import { getPendingAiIntent } from "@/lib/auth/pending-ai";
 import type { QuestionExplanation } from "@/lib/ai/schema";
@@ -94,6 +94,10 @@ export function ResultView({ attemptId }: { attemptId: string }) {
       if (!response.ok || !payload.explanation) throw new Error(payload.error ?? "AI izahını hazırda yaratmaq mümkün olmadı. Bir az sonra yenidən cəhd edin.");
       setAiState((state) => ({ ...state, [questionId]: { explanation: payload.explanation } }));
     } catch (error) {
+      if (error instanceof AttemptSyncError && error.status === 401 && !automatic) {
+        window.location.assign(loginPath(aiReturnPath(attemptId, questionId)));
+        return;
+      }
       setAiState((state) => ({ ...state, [questionId]: { error: error instanceof Error ? error.message : "AI izahını hazırda yaratmaq mümkün olmadı. Bir az sonra yenidən cəhd edin." } }));
     }
   }, [attemptId, result]);
@@ -119,8 +123,8 @@ export function ResultView({ attemptId }: { attemptId: string }) {
             ...Object.fromEntries(Object.entries(payload.explanations).map(([id, explanation]) => [id, { explanation }])),
           }));
         }
-      } catch {
-        if (active) setSyncWarning("Nəticə hesabınıza saxlanmadı. Bu səhifəni yeniləyib yenidən cəhd edin.");
+      } catch (error) {
+        if (active) setSyncWarning(error instanceof Error ? error.message : "Nəticə hesabınıza saxlanmadı. Bu səhifəni yeniləyib yenidən cəhd edin.");
       }
     })();
     return () => { active = false; };

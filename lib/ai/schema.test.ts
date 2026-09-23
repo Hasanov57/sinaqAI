@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { AiNotConfiguredError, AiProviderError, generateWithGemini } from "./gemini";
+import { AiNotConfiguredError, AiProviderError, generateWithGemini, getGeminiApiKey } from "./gemini";
 import { answerCacheHash, parseCachedExplanation } from "./cache";
 import { buildExplanationPrompt, type ExplanationContext } from "./prompts";
 import { parseQuestionExplanation } from "./schema";
@@ -36,9 +36,30 @@ describe("grounded structured explanations", () => {
     vi.stubGlobal("fetch", mock);
     expect(await generateWithGemini(context, "gemini-3.8-flash")).toEqual(valid);
     expect(mock.mock.calls[0][0]).toContain("gemini-3.8-flash");
+    const body = JSON.parse(mock.mock.calls[0][1].body);
+    expect(body.generationConfig).toMatchObject({
+      responseMimeType: "application/json",
+      responseSchema: { properties: { miniExample: { type: "STRING", nullable: true } } },
+    });
+    expect(body.generationConfig.responseFormat).toBeUndefined();
+  });
+  it("accepts the existing server-only AI_API_KEY name", () => {
+    vi.stubEnv("GEMINI_API_KEY", "");
+    vi.stubEnv("AI_API_KEY", "existing-gemini-key");
+    expect(getGeminiApiKey()).toBe("existing-gemini-key");
+  });
+  it("includes a trusted question diagram without putting base64 in the text prompt", async () => {
+    vi.stubEnv("GEMINI_API_KEY", "test-key");
+    const mock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ candidates: [{ content: { parts: [{ text: JSON.stringify(valid) }] } }] }) });
+    vi.stubGlobal("fetch", mock);
+    await generateWithGemini({ ...context, questionImageBase64: "png-data" }, "gemini-3.8-flash");
+    const body = JSON.parse(mock.mock.calls[0][1].body);
+    expect(body.contents[0].parts[1]).toEqual({ inlineData: { mimeType: "image/png", data: "png-data" } });
+    expect(body.contents[0].parts[0].text).not.toContain("png-data");
   });
   it("reports missing configuration and provider failures without exposing them to the UI", async () => {
     vi.stubEnv("GEMINI_API_KEY", "");
+    vi.stubEnv("AI_API_KEY", "");
     await expect(generateWithGemini(context, "gemini-3.8-flash")).rejects.toBeInstanceOf(AiNotConfiguredError);
     vi.stubEnv("GEMINI_API_KEY", "test-key");
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: async () => ({ candidates: [{ content: { parts: [{ text: "{}" }] } }] }) }));

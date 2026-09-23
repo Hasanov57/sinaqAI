@@ -110,7 +110,7 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 
 The current Supabase dashboard calls these the **Publishable key** and **Secret key**. For an older project, the compatible names `NEXT_PUBLIC_SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY` are also accepted. If copying from Supabase's Connect dialog, put the values under the variable names above: add `NEXT_PUBLIC_` to the publishable key name, keep the secret key server-only, and skip `SUPABASE_JWKS_URL` (this app does not need it).
 
-`SUPABASE_SERVICE_ROLE_KEY` and `GEMINI_API_KEY` are server-only secrets. Never prefix either with `NEXT_PUBLIC_` or import them into client components. The Gemini key is used only by the server route and is never returned to the browser. AI explanations require a signed-in Supabase user and can be requested only for an incorrect multiple-choice response. The server-role key lets the route store personalized explanation caches and enforce a shared eight-requests-per-minute user limit. They are educational assistance, not official DİM material or grading.
+`SUPABASE_SERVICE_ROLE_KEY` and `GEMINI_API_KEY` are server-only secrets. Never prefix either with `NEXT_PUBLIC_` or import them into client components. Existing setups with the server-only name `AI_API_KEY` are also accepted for Gemini, though `GEMINI_API_KEY` is preferred. The Gemini key is used only by the server route and is never returned to the browser. AI explanations require a signed-in Supabase user and can be requested only for an incorrect multiple-choice response. The server-role key lets the route store personalized explanation caches and enforce a shared eight-requests-per-minute user limit. They are educational assistance, not official DİM material or grading.
 
 ## Supabase setup
 

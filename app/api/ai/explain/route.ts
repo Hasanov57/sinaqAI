@@ -1,13 +1,15 @@
 import { z } from "zod";
 import { NextResponse } from "next/server";
 import { answerCacheHash, parseCachedExplanation } from "@/lib/ai/cache";
-import { AiNotConfiguredError } from "@/lib/ai/gemini";
+import { AiNotConfiguredError, getGeminiApiKey } from "@/lib/ai/gemini";
+import { loadOfficialQuestionImage } from "@/lib/ai/image";
 import { generateQuestionExplanation } from "@/lib/ai/provider";
 import type { ExplanationContext } from "@/lib/ai/prompts";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
+export const maxDuration = 60;
 
 const inputSchema = z.object({ attemptId: z.uuid(), questionId: z.string().min(1).max(120) });
 const unavailable = "AI izahını hazırda yaratmaq mümkün olmadı. Bir az sonra yenidən cəhd edin.";
@@ -40,7 +42,7 @@ export async function POST(request: Request) {
   const attempt = attemptResult.data;
   if (attemptResult.error || !attempt) return NextResponse.json({ error: "Tamamlanmış nəticə tapılmadı." }, { status: 404 });
   const questionResult = await admin.from("questions")
-    .select("id,question_type,question_text,official_explanation,topic_id,subject_id,grade_level,alt_standard,passage_id")
+    .select("id,question_type,question_text,question_image_url,official_explanation,topic_id,subject_id,grade_level,alt_standard,passage_id")
     .eq("exam_id", attempt.exam_id).eq("canonical_id", questionId).maybeSingle();
   const question = questionResult.data;
   if (questionResult.error || !question || question.question_type !== "multiple_choice") {
@@ -70,8 +72,8 @@ export async function POST(request: Request) {
   const cached = cacheResult.data?.content ? parseCachedExplanation(cacheResult.data.content) : null;
   if (cached) return NextResponse.json({ explanation: cached, cached: true });
 
-  if ((process.env.AI_PROVIDER ?? "gemini") !== "gemini" || !process.env.GEMINI_API_KEY) {
-    if (process.env.NODE_ENV !== "production") console.warn("AI_PROVIDER or GEMINI_API_KEY is not configured.");
+  if ((process.env.AI_PROVIDER ?? "gemini") !== "gemini" || !getGeminiApiKey()) {
+    if (process.env.NODE_ENV !== "production") console.warn("AI_PROVIDER or Gemini API key is not configured.");
     return NextResponse.json({ error: "AI xidməti hazırda aktiv deyil." }, { status: 503 });
   }
   const quota = await admin.rpc("consume_ai_explanation_quota", { p_user_id: user.id });
@@ -86,6 +88,13 @@ export async function POST(request: Request) {
   if (subjectResult.error || topicResult?.error || passageResult?.error) {
     return NextResponse.json({ error: unavailable }, { status: 503 });
   }
+  let questionImageBase64: string | undefined;
+  if (question.question_image_url) {
+    try { questionImageBase64 = await loadOfficialQuestionImage(question.question_image_url); }
+    catch {
+      return NextResponse.json({ error: "Rəsmi sual şəklini hazırda oxumaq mümkün olmadı." }, { status: 503 });
+    }
+  }
   const context: ExplanationContext = {
     subject: subjectResult.data?.name ?? "",
     topic: topicResult?.data?.name ?? "",
@@ -97,6 +106,7 @@ export async function POST(request: Request) {
     officialExplanation: question.official_explanation,
     grade: question.grade_level,
     altStandard: question.alt_standard,
+    questionImageBase64,
   };
   try {
     const explanation = await generateQuestionExplanation(context);
