@@ -8,7 +8,7 @@ export async function GET(request: NextRequest) {
   response.headers.set("cache-control", "no-store");
   const code = requestUrl.searchParams.get("code");
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!code || !url || !key) return response;
 
   const supabase = createServerClient(url, key, {

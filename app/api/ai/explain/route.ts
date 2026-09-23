@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { NextResponse } from "next/server";
 import { answerCacheHash, parseCachedExplanation } from "@/lib/ai/cache";
-import { AiNotConfiguredError, getGeminiApiKey } from "@/lib/ai/gemini";
+import { AiNotConfiguredError, AiProviderError, getGeminiApiKey } from "@/lib/ai/gemini";
 import { loadOfficialQuestionImage } from "@/lib/ai/image";
 import { generateQuestionExplanation } from "@/lib/ai/provider";
 import type { ExplanationContext } from "@/lib/ai/prompts";
@@ -118,7 +118,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ explanation, cached: false });
   } catch (error) {
     if (error instanceof AiNotConfiguredError) return NextResponse.json({ error: "AI xidməti hazırda aktiv deyil." }, { status: 503 });
-    if (process.env.NODE_ENV !== "production") console.warn("AI explanation generation failed:", error);
+    // Provider errors contain only a status or validation category, never a key or prompt.
+    console.error("AI explanation generation failed:", error instanceof AiProviderError ? error.message : "Unexpected provider failure");
     return NextResponse.json({ error: unavailable }, { status: 502 });
   }
 }

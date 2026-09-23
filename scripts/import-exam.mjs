@@ -7,8 +7,8 @@ const { loadEnvConfig } = nextEnv;
 loadEnvConfig(process.cwd());
 
 const path = process.argv[2] ?? "data/exams/2025-03-02-graduation-11-az.json";
-const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.SUPABASE_URL;
-const secretKey = process.env.SUPABASE_SECRET_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY;
+const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
+const secretKey = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 if (!url || !secretKey) {
   throw new Error("Set the Supabase URL and the server-only SUPABASE_SECRET_KEY (or legacy SUPABASE_SERVICE_ROLE_KEY) in .env.local");

@@ -43,7 +43,10 @@ export async function POST(request: Request) {
   const exam = getExam(payload.examId);
   if (!exam || exam.status === "demo") return NextResponse.json({ error: "Rəsmi imtahan tapılmadı." }, { status: 404 });
   const admin = createSupabaseAdminClient();
-  if (!admin) return NextResponse.json({ error: "Nəticələrin saxlanması aktiv deyil." }, { status: 503 });
+  if (!admin) {
+    console.error("Official attempt sync: Supabase server key is missing from this deployment.");
+    return NextResponse.json({ error: "Nəticələrin saxlanması aktiv deyil. Vercel-də Supabase server açarını yoxlayın." }, { status: 503 });
+  }
   if (new Set(payload.answers.map((answer) => answer.questionId)).size !== payload.answers.length) {
     return NextResponse.json({ error: "Təkrar sual cavabı göndərilib." }, { status: 400 });
   }
