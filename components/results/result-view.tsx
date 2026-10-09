@@ -8,6 +8,7 @@ import { syncOfficialAttempt } from "@/lib/attempts/client";
 import { loginPath, saveResultReturnPath } from "@/lib/auth/return-path";
 import type { QuestionExplanation } from "@/lib/ai/schema";
 import { getExam } from "@/lib/data/demo-exams";
+import { regradeAttemptResult } from "@/lib/grading/grading";
 import { createSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase/browser";
 import type { AttemptResult } from "@/types/exam";
 
@@ -17,6 +18,10 @@ function formatDuration(seconds: number) {
   return `${minutes} dəq ${remainder} san`;
 }
 
+function formatScore(value: number) {
+  return new Intl.NumberFormat("az-AZ", { maximumFractionDigits: 2 }).format(value);
+}
+
 export function ResultView({ attemptId }: { attemptId: string }) {
   const [result, setResult] = useState<AttemptResult | null>(null);
   const [loaded, setLoaded] = useState(false);
@@ -24,20 +29,29 @@ export function ResultView({ attemptId }: { attemptId: string }) {
   const [syncWarning, setSyncWarning] = useState("");
   const [savingResult, setSavingResult] = useState(false);
   const [savedResult, setSavedResult] = useState(false);
+  const [topicsExpanded, setTopicsExpanded] = useState(false);
   const pendingSaveConsumed = useRef(false);
 
   useEffect(() => {
     const hydrationTask = window.setTimeout(async () => {
       const raw = window.localStorage.getItem(`sinaqai:result:${attemptId}`);
       if (raw) {
-        try { setResult(JSON.parse(raw) as AttemptResult); } catch { setResult(null); }
+        try {
+          const stored = JSON.parse(raw) as AttemptResult;
+          const storedExam = getExam(stored.examId);
+          const refreshed = storedExam ? regradeAttemptResult(storedExam, stored) : stored;
+          setResult(refreshed);
+          window.localStorage.setItem(`sinaqai:result:${attemptId}`, JSON.stringify(refreshed));
+        } catch { setResult(null); }
       } else if (isSupabaseConfigured()) {
         const response = await fetch(`/api/attempts/${encodeURIComponent(attemptId)}`).catch(() => null);
         if (response?.ok) {
           const payload = await response.json() as { result?: AttemptResult };
           if (payload.result) {
-            setResult(payload.result);
-            window.localStorage.setItem(`sinaqai:result:${attemptId}`, JSON.stringify(payload.result));
+            const fetchedExam = getExam(payload.result.examId);
+            const refreshed = fetchedExam ? regradeAttemptResult(fetchedExam, payload.result) : payload.result;
+            setResult(refreshed);
+            window.localStorage.setItem(`sinaqai:result:${attemptId}`, JSON.stringify(refreshed));
           }
         }
       }
@@ -135,6 +149,7 @@ export function ResultView({ attemptId }: { attemptId: string }) {
   }
 
   const percentage = result.maxScore ? Math.round((result.score / result.maxScore) * 100) : 0;
+  const official = exam.usesOfficialScoring === true;
   const correct = result.answers.filter((answer) => answer.status === "correct").length;
   const unanswered = result.answers.filter((answer) => answer.status === "unanswered").length;
   const ungraded = result.answers.filter((answer) => answer.status === "ungraded").length;
@@ -163,7 +178,7 @@ export function ResultView({ attemptId }: { attemptId: string }) {
           <div className="score-ring" style={{ "--score": `${percentage * 3.6}deg` } as React.CSSProperties}>
             <div>
               <strong>{result.maxScore ? `${percentage}%` : "—"}</strong>
-              <span>{result.maxScore ? `${result.score} / ${result.maxScore} ${exam.usesOfficialScoring === false ? "düzgün" : "bal"}` : "Rəy gözləyir"}</span>
+              <span>{result.maxScore ? `${formatScore(result.score)} / ${formatScore(result.maxScore)} ${official ? "ilkin bal" : "düzgün"}` : "Rəy gözləyir"}</span>
             </div>
           </div>
         </div>
@@ -180,14 +195,16 @@ export function ResultView({ attemptId }: { attemptId: string }) {
             <article className="summary-card"><Clock3 size={21} /><div><strong>{formatDuration(result.durationSeconds)}</strong><span>Sərf olunan vaxt</span></div></article>
           </div>
 
+          {official && <p className="score-disclaimer">Bal DİM-in 2025 düsturları ilə hesablanır. Bu, yekun rəsmi nəticə deyil: 6 dinləmə sualı daxil edilməyib, yazılı açıq cavablar isə yoxlanılmayıb. Riyaziyyatda kodlaşdırılan 5 cavab rəsmi rəqəmlə tutuşdurulur.</p>}
+
           <div className="results-columns">
             <div>
               <h2 className="results-title">Fənlər üzrə nəticə</h2>
               <div className="subject-results">
                 {subjectStats.map(([subject, stats]) => (
                   <article className="subject-result" key={subject}>
-                    <div className="subject-result-top"><strong>{subject}</strong><span>{stats.maxScore ? `${stats.score} / ${stats.maxScore} ${exam.usesOfficialScoring === false ? "düzgün" : "bal"}` : "Qiymətləndirilməyib"}</span></div>
-                    <div className="result-bar"><span style={{ width: `${stats.maxScore ? (stats.score / stats.maxScore) * 100 : 0}%` }} /></div>
+                    <div className="subject-result-top"><strong>{subject}</strong><span>{official ? `${formatScore(stats.score)} / 100 ilkin bal` : stats.maxScore ? `${formatScore(stats.score)} / ${formatScore(stats.maxScore)} düzgün` : "Qiymətləndirilməyib"}</span></div>
+                    <div className="result-bar"><span style={{ width: `${official ? stats.score : stats.maxScore ? (stats.score / stats.maxScore) * 100 : 0}%` }} /></div>
                     <div className="subject-counts"><span>{stats.correct} düzgün</span><span>{stats.wrong} səhv</span><span>{stats.unanswered} cavabsız</span><span>{stats.ungraded} yoxlanılmayıb</span></div>
                   </article>
                 ))}
@@ -196,13 +213,14 @@ export function ResultView({ attemptId }: { attemptId: string }) {
             <div>
               <h2 className="results-title">Mövzular</h2>
               <div className="topic-results">
-                {topicStats.map((topic) => (
+                {(topicsExpanded ? topicStats : topicStats.slice(0, 4)).map((topic) => (
                   <div className="topic-result" key={topic.topic}>
                     <span>{topic.topic}</span><strong>{topic.accuracyPercentage}%</strong>
                     <div className="result-bar"><span style={{ width: `${topic.accuracyPercentage}%` }} /></div>
                   </div>
                 ))}
               </div>
+              {topicStats.length > 4 && <button className="topic-toggle" type="button" aria-expanded={topicsExpanded} onClick={() => setTopicsExpanded((expanded) => !expanded)}>{topicsExpanded ? "Daha az göstər" : `Daha çox göstər (${topicStats.length - 4})`}</button>}
             </div>
           </div>
 

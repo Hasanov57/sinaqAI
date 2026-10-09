@@ -267,6 +267,9 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .subject-counts { display: flex; gap: 14px; color: var(--muted); font-size: .76rem; }
 .topic-result > strong { color: var(--blue); }
 .topic-result .result-bar { flex-basis: 100%; }
+.topic-toggle { margin-top: 12px; padding: 11px 16px; border: 1px solid var(--line); border-radius: 12px; background: white; color: var(--blue); font: 700 .9rem var(--font-display); cursor: pointer; }
+.topic-toggle:hover { border-color: var(--blue); }
+.score-disclaimer { margin: 18px 0 0; padding: 14px 18px; border: 1px solid #bfdbfe; border-radius: 12px; background: #eff6ff; color: #1e3a8a; line-height: 1.5; }
 .review-section { margin-top: 64px; }
 .review-list { display: grid; gap: 11px; }
 .review-card { border: 1px solid var(--line); border-radius: 15px; background: #fff; overflow: hidden; scroll-margin-top: 90px; }

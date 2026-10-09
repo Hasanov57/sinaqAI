@@ -59,7 +59,7 @@ export default async function DashboardPage() {
       </article>
       <article className="account-card"><h2>Nəticələr</h2>
         {!admin || attemptsResult?.error ? <p>Nəticə tarixçəsi hazırda yüklənmir.</p>
-          : attempts.length ? <p>Son {attempts.length} imtahanın nəticəsi göstərilir. Ən son nəticə: {attempts[0].max_score ? `${attempts[0].total_score ?? 0} / ${attempts[0].max_score} düzgün` : "rəy gözləyir"}.</p>
+          : attempts.length ? <p>Son {attempts.length} imtahanın nəticəsi göstərilir. Ən son nəticəyə <Link href={`/results/${attempts[0].id}`}>buradan baxın</Link>. Natamam imtahanın balı yenilənmiş DİM qaydaları ilə nəticə səhifəsində hesablanır.</p>
             : <p>Nəticələr imtahanı tamamladıqdan sonra burada görünəcək.</p>}
       </article>
       <article className="account-card"><h2>Zəif mövzular</h2>

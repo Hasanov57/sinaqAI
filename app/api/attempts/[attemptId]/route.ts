@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getExam } from "@/lib/data/demo-exams";
+import { regradeAttemptResult } from "@/lib/grading/grading";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { AttemptResult, GradedAnswer } from "@/types/exam";
@@ -53,5 +54,5 @@ export async function GET(_request: Request, { params }: { params: Promise<{ att
     durationSeconds: attempt.duration_seconds ?? 0,
     score: Number(attempt.total_score ?? 0), maxScore: Number(attempt.max_score ?? 0), answers: gradedAnswers,
   };
-  return NextResponse.json({ result });
+  return NextResponse.json({ result: regradeAttemptResult(exam, result) });
 }

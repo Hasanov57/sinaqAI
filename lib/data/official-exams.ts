@@ -80,8 +80,7 @@ function mapQuestion(question: DatasetQuestion): ExamQuestion {
       text: option.text,
       isCorrect: option.key === question.correct_answer,
     })),
-    // The explanation PDF does not state a point value. The runtime value is
-    // used only to count correct answers and is never presented as official bal.
+    // Raw grading units; DİM subject coefficients are applied in gradeExam.
     maxScore: question.max_score ?? question.official_rubric?.max_score ?? (question.question_type === "multiple_choice" ? 1 : 0),
     officialExplanation: question.official_explanation,
   };
@@ -125,11 +124,11 @@ export const officialTestExam: Exam = {
   subjectOrder,
   passages: (dataset.passages ?? []).map(mapPassage),
   questionCount: dataset.questions.length,
-  maxScore: dataset.questions.length,
+  maxScore: 300,
   status: "draft",
   sourceUrl: dataset.exam.official_source_url,
   sourceOrganization: dataset.exam.source_organization,
   datasetLabel: dataset.exam.dataset_label,
-  usesOfficialScoring: false,
+  usesOfficialScoring: true,
   questions: orderedQuestions,
 };

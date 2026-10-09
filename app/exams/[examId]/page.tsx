@@ -43,7 +43,7 @@ export default async function ExamDetailPage({ params }: Props) {
               <div>
                 <strong>{exam.status === "draft" ? "Natamam rəsmi imtahan dataseti" : "Demo məlumatı"}</strong><br />
                 {exam.status === "draft"
-                  ? `${exam.questionCount} qeyri-dinləmə sualı rəsmi izah PDF-indən götürülüb. 6 dinləmə sualı və audio hələ əlavə edilməyib; imtahan tam kimi təqdim olunmur. Rəsmi bal qaydası olmadığından yalnız çoxseçimli suallar avtomatik yoxlanılır.`
+                  ? `${exam.questionCount} qeyri-dinləmə sualı rəsmi izah PDF-indən götürülüb. Bal DİM-in 2025 düsturları ilə hesablanır, lakin 6 dinləmə sualı yoxdur və yazılı açıq cavablar avtomatik qiymətləndirilmir. Göstərilən bal yekun rəsmi nəticə deyil.`
                   : "Bu imtahan platformanın iş prinsipini göstərmək üçün hazırlanıb və rəsmi DİM imtahanı deyil."}
               </div>
             </div>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { gradeExam } from "../grading/grading";
+import { gradeExam, regradeAttemptResult } from "../grading/grading";
 import { officialTestExam } from "./official-exams";
 import { stripDimSourceHeader } from "./sanitize-dim";
 
@@ -46,7 +46,7 @@ describe("official 79-question incomplete test dataset", () => {
     expect(officialTestExam.questions.filter((question) => question.type !== "multiple_choice").every((question) => question.officialAnswer)).toBe(true);
   });
 
-  it("grades all official choices deterministically", () => {
+  it("grades all official choices with the 2025 subject coefficients", () => {
     const answers: Record<string, string> = {};
     const multipleChoice = officialTestExam.questions.filter((question) => question.type === "multiple_choice");
     for (const question of multipleChoice) {
@@ -61,9 +61,40 @@ describe("official 79-question incomplete test dataset", () => {
       new Date().toISOString(),
     );
 
-    expect(result.score).toBe(multipleChoice.length);
+    expect(result.score).toBeCloseTo(20 * 100 / 37 + 20 * 5 / 2 + 13 * 25 / 8);
+    expect(result.maxScore).toBe(300);
     expect(result.answers.filter((answer) => answer.status === "correct")).toHaveLength(multipleChoice.length);
     expect(result.answers.filter((answer) => answer.status === "unanswered")).toHaveLength(officialTestExam.questions.length - multipleChoice.length);
+  });
+
+  it("uses the verified 20 closed/10 written language split", () => {
+    const language = officialTestExam.questions.filter((question) => question.subject === "Azərbaycan dili");
+    expect(language.filter((question) => question.type === "multiple_choice")).toHaveLength(20);
+    expect(language.filter((question) => question.type !== "multiple_choice")).toHaveLength(10);
+    expect(language.find((question) => question.variantNumbers?.A === 51)?.options.find((option) => option.isCorrect)?.key).toBe("C");
+    expect(language.find((question) => question.variantNumbers?.A === 54)?.options.find((option) => option.isCorrect)?.key).toBe("A");
+  });
+
+  it("grades exact coded math answers but leaves written solutions for review", () => {
+    const coded = officialTestExam.questions.find((question) => question.variantNumbers?.A === 76 && question.subject === "Riyaziyyat");
+    const written = officialTestExam.questions.find((question) => question.variantNumbers?.A === 79 && question.subject === "Riyaziyyat");
+    if (!coded || !written) throw new Error("Expected math questions were not found");
+    const result = gradeExam(officialTestExam, { [coded.id]: "1.5", [written.id]: "4" }, "coded-test", new Date().toISOString());
+    expect(result.answers.find((answer) => answer.questionId === coded.id)).toMatchObject({ status: "correct", awardedScore: 25 / 8 });
+    expect(result.answers.find((answer) => answer.questionId === written.id)).toMatchObject({ status: "ungraded", awardedScore: 0, maxScore: 25 / 4 });
+  });
+
+  it("recalculates a saved result that used the old one-point-per-choice rule", () => {
+    const question = officialTestExam.questions.find((item) => item.subject === "Azərbaycan dili" && item.type === "multiple_choice");
+    if (!question) throw new Error("Expected a language choice question");
+    const correctOption = question.options.find((option) => option.isCorrect);
+    if (!correctOption) throw new Error("Expected an official answer");
+    const original = gradeExam(officialTestExam, { [question.id]: correctOption.id }, "saved-test", new Date().toISOString());
+    const oldResult = { ...original, score: 1, maxScore: 79, answers: original.answers.map((answer) => answer.questionId === question.id ? { ...answer, awardedScore: 1, maxScore: 1 } : answer) };
+    const refreshed = regradeAttemptResult(officialTestExam, oldResult);
+    expect(refreshed.score).toBe(2.5);
+    expect(refreshed.maxScore).toBe(300);
+    expect(refreshed.answers.find((answer) => answer.questionId === question.id)?.status).toBe("correct");
   });
 
   it("keeps booklet source headers out of all visible question and passage text", () => {
