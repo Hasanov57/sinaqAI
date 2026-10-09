@@ -38,6 +38,8 @@ describe("grounded structured explanations", () => {
     expect(mock.mock.calls[0][0]).toContain("gemini-3.8-flash");
     const body = JSON.parse(mock.mock.calls[0][1].body);
     expect(body.generationConfig).toMatchObject({
+      maxOutputTokens: 2400,
+      thinkingConfig: { thinkingLevel: "low" },
       responseMimeType: "application/json",
       responseSchema: { properties: { miniExample: { type: "STRING", nullable: true } } },
     });
@@ -47,6 +49,19 @@ describe("grounded structured explanations", () => {
     vi.stubEnv("GEMINI_API_KEY", "");
     vi.stubEnv("AI_API_KEY", "existing-gemini-key");
     expect(getGeminiApiKey()).toBe("existing-gemini-key");
+  });
+  it("retries a temporary Gemini outage but not a bad request", async () => {
+    vi.stubEnv("GEMINI_API_KEY", "test-key");
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({ ok: false, status: 503 })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ candidates: [{ content: { parts: [{ text: JSON.stringify(valid) }] } }] }) });
+    vi.stubGlobal("fetch", fetchMock);
+    expect(await generateWithGemini(context, "gemini-3.8-flash")).toEqual(valid);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+
+    fetchMock.mockReset().mockResolvedValue({ ok: false, status: 400 });
+    await expect(generateWithGemini(context, "gemini-3.8-flash")).rejects.toThrow("Gemini HTTP 400");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
   it("includes a trusted question diagram without putting base64 in the text prompt", async () => {
     vi.stubEnv("GEMINI_API_KEY", "test-key");
