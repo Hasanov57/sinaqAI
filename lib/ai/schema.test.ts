@@ -63,6 +63,21 @@ describe("grounded structured explanations", () => {
     await expect(generateWithGemini(context, "gemini-3.8-flash")).rejects.toThrow("Gemini HTTP 400");
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
+  it("uses the lighter model when the primary model's quota is exhausted", async () => {
+    vi.stubEnv("GEMINI_API_KEY", "test-key");
+    const mock = vi.fn()
+      .mockResolvedValueOnce({ ok: false, status: 429 })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ candidates: [{ content: { parts: [{ text: JSON.stringify(valid) }] } }] }) });
+    vi.stubGlobal("fetch", mock);
+    expect(await generateWithGemini(context, "gemini-3.8-flash")).toEqual(valid);
+    expect(mock).toHaveBeenCalledTimes(2);
+    expect(mock.mock.calls[0][0]).toContain("gemini-3.8-flash");
+    expect(mock.mock.calls[1][0]).toContain("gemini-3.5-flash-lite");
+
+    mock.mockReset().mockResolvedValue({ ok: false, status: 429 });
+    await expect(generateWithGemini(context, "gemini-3.8-flash")).rejects.toMatchObject({ statusCode: 429 });
+    expect(mock).toHaveBeenCalledTimes(2);
+  });
   it("includes a trusted question diagram without putting base64 in the text prompt", async () => {
     vi.stubEnv("GEMINI_API_KEY", "test-key");
     const mock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ candidates: [{ content: { parts: [{ text: JSON.stringify(valid) }] } }] }) });

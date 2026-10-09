@@ -101,6 +101,9 @@ export async function POST(request: Request) {
   } catch (error) {
     if (error instanceof AiNotConfiguredError) return NextResponse.json({ error: "AI xidməti hazırda aktiv deyil." }, { status: 503 });
     console.error("AI explanation generation failed:", error instanceof AiProviderError ? error.message : "Unexpected provider failure");
+    if (error instanceof AiProviderError && error.statusCode === 429) {
+      return NextResponse.json({ error: "AI xidmətinin limiti dolub. Bir müddət sonra yenidən cəhd edin." }, { status: 429 });
+    }
     return NextResponse.json({ error: unavailable }, { status: 502 });
   }
 }
