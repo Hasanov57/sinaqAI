@@ -190,6 +190,26 @@ export function gradeExam(
       };
     }
 
+    if (exam.usesOfficialScoring && question.subject === "İngilis dili" &&
+        question.type === "short_answer" && (question.acceptedAnswers?.length ?? 0) > 0 &&
+        studentAnswer.trim()) {
+      return {
+        questionId: question.id,
+        questionNumber: question.number,
+        selectedOptionId: null,
+        selectedKey: null,
+        correctKey: null,
+        selectedAnswerText: studentAnswer,
+        solutionImagePath,
+        status: "wrong" as const,
+        isCorrect: false,
+        awardedScore: 0,
+        maxScore,
+        subject: question.subject,
+        topic: question.topic,
+      };
+    }
+
     const unanswered = !studentAnswer.trim() && !solutionImagePath;
     return {
       questionId: question.id,

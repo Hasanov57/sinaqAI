@@ -84,6 +84,21 @@ describe("official 79-question incomplete test dataset", () => {
     expect(result.answers.find((answer) => answer.questionId === written.id)).toMatchObject({ status: "ungraded", awardedScore: 0, maxScore: 25 / 4 });
   });
 
+  it("checks the two English one-word answers against the PDF and leaves longer writing for AI review", () => {
+    const word = officialTestExam.questions.find((question) => question.id === "2025-03-02-en-021");
+    const definition = officialTestExam.questions.find((question) => question.id === "2025-03-02-en-022");
+    const writing = officialTestExam.questions.find((question) => question.id === "2025-03-02-en-024");
+    if (!word || !definition || !writing) throw new Error("English questions were not found");
+    const result = gradeExam(officialTestExam, {
+      [word.id]: "Huge.",
+      [definition.id]: "rebuild",
+      [writing.id]: "We learn about history. We learn about culture. We see old architecture.",
+    }, "english-open-test", new Date().toISOString());
+    expect(result.answers.find((answer) => answer.questionId === word.id)).toMatchObject({ status: "correct", awardedScore: 200 / 37 });
+    expect(result.answers.find((answer) => answer.questionId === definition.id)).toMatchObject({ status: "wrong", awardedScore: 0 });
+    expect(result.answers.find((answer) => answer.questionId === writing.id)).toMatchObject({ status: "ungraded", awardedScore: 0 });
+  });
+
   it("recalculates a saved result that used the old one-point-per-choice rule", () => {
     const question = officialTestExam.questions.find((item) => item.subject === "Azərbaycan dili" && item.type === "multiple_choice");
     if (!question) throw new Error("Expected a language choice question");

@@ -7,6 +7,7 @@ import { calculateTopicStatistics } from "@/lib/analytics/statistics";
 import { syncOfficialAttempt } from "@/lib/attempts/client";
 import { loginPath, saveResultReturnPath } from "@/lib/auth/return-path";
 import type { QuestionExplanation } from "@/lib/ai/schema";
+import { openGradeFraction, openGradeSchema, type OpenGrade } from "@/lib/ai/open-grade-schema";
 import { getExam } from "@/lib/data/demo-exams";
 import { regradeAttemptResult } from "@/lib/grading/grading";
 import { createSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase/browser";
@@ -26,6 +27,7 @@ export function ResultView({ attemptId }: { attemptId: string }) {
   const [result, setResult] = useState<AttemptResult | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [aiState, setAiState] = useState<Record<string, { loading?: boolean; explanation?: QuestionExplanation; error?: string }>>({});
+  const [openGrades, setOpenGrades] = useState<Record<string, { loading?: boolean; grade?: OpenGrade; error?: string }>>({});
   const [syncWarning, setSyncWarning] = useState("");
   const [savingResult, setSavingResult] = useState(false);
   const [savedResult, setSavedResult] = useState(false);
@@ -34,6 +36,14 @@ export function ResultView({ attemptId }: { attemptId: string }) {
 
   useEffect(() => {
     const hydrationTask = window.setTimeout(async () => {
+      try {
+        const savedGrades = JSON.parse(window.localStorage.getItem(`sinaqai:open-grades:${attemptId}`) ?? "{}") as Record<string, unknown>;
+        const valid = Object.fromEntries(Object.entries(savedGrades).flatMap(([id, value]) => {
+          const parsed = openGradeSchema.safeParse(value);
+          return parsed.success ? [[id, { grade: parsed.data }]] : [];
+        }));
+        setOpenGrades(valid);
+      } catch { setOpenGrades({}); }
       const raw = window.localStorage.getItem(`sinaqai:result:${attemptId}`);
       if (raw) {
         try {
@@ -59,6 +69,12 @@ export function ResultView({ attemptId }: { attemptId: string }) {
     }, 0);
     return () => window.clearTimeout(hydrationTask);
   }, [attemptId]);
+
+  useEffect(() => {
+    if (!loaded) return;
+    const grades = Object.fromEntries(Object.entries(openGrades).flatMap(([id, state]) => state.grade ? [[id, state.grade]] : []));
+    window.localStorage.setItem(`sinaqai:open-grades:${attemptId}`, JSON.stringify(grades));
+  }, [attemptId, loaded, openGrades]);
 
   const exam = result ? getExam(result.examId) : undefined;
   const topicStats = useMemo(
@@ -97,6 +113,25 @@ export function ResultView({ attemptId }: { attemptId: string }) {
       setAiState((state) => ({ ...state, [questionId]: { explanation: payload.explanation } }));
     } catch (error) {
       setAiState((state) => ({ ...state, [questionId]: { error: error instanceof Error ? error.message : "AI izahını hazırda yaratmaq mümkün olmadı. Bir az sonra yenidən cəhd edin." } }));
+    }
+  }, [result]);
+
+  const gradeOpenAnswer = useCallback(async (questionId: string) => {
+    if (!result) return;
+    const answer = result.answers.find((item) => item.questionId === questionId);
+    if (answer?.status !== "ungraded" || !answer.selectedAnswerText?.trim()) return;
+    setOpenGrades((state) => ({ ...state, [questionId]: { loading: true } }));
+    try {
+      const response = await fetch("/api/ai/grade-open", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ examId: result.examId, questionId, studentAnswer: answer.selectedAnswerText }),
+      });
+      const payload = await response.json() as { grade?: unknown; error?: string };
+      const grade = openGradeSchema.safeParse(payload.grade);
+      if (!response.ok || !grade.success) throw new Error(payload.error ?? "AI qiymətləndirməsini hazırda aparmaq mümkün olmadı.");
+      setOpenGrades((state) => ({ ...state, [questionId]: { grade: grade.data } }));
+    } catch (error) {
+      setOpenGrades((state) => ({ ...state, [questionId]: { error: error instanceof Error ? error.message : "AI qiymətləndirməsini hazırda aparmaq mümkün olmadı." } }));
     }
   }, [result]);
 
@@ -154,6 +189,15 @@ export function ResultView({ attemptId }: { attemptId: string }) {
   const unanswered = result.answers.filter((answer) => answer.status === "unanswered").length;
   const ungraded = result.answers.filter((answer) => answer.status === "ungraded").length;
   const wrong = result.answers.filter((answer) => answer.status === "wrong").length;
+  const aiEstimatedPoints = result.answers.reduce((sum, answer) => {
+    const grade = openGrades[answer.questionId]?.grade;
+    const fraction = grade ? openGradeFraction(grade.score) : null;
+    return sum + (answer.status === "ungraded" && answer.subject === "İngilis dili" && fraction !== null ? fraction * 200 / 37 : 0);
+  }, 0);
+  const aiGradeCount = result.answers.filter((answer) => {
+    const grade = openGrades[answer.questionId]?.grade;
+    return answer.status === "ungraded" && grade && openGradeFraction(grade.score) !== null;
+  }).length;
 
   return (
     <>
@@ -191,11 +235,12 @@ export function ResultView({ attemptId }: { attemptId: string }) {
             <article className="summary-card summary-correct"><Check size={21} /><div><strong>{correct}</strong><span>Düzgün</span></div></article>
             <article className="summary-card summary-wrong"><X size={21} /><div><strong>{wrong}</strong><span>Səhv</span></div></article>
             <article className="summary-card summary-empty"><CircleDashed size={21} /><div><strong>{unanswered}</strong><span>Cavabsız</span></div></article>
-            <article className="summary-card"><CircleDashed size={21} /><div><strong>{ungraded}</strong><span>Yoxlanılmayıb</span></div></article>
+            <article className="summary-card"><CircleDashed size={21} /><div><strong>{ungraded}</strong><span>{official ? "Rəsmi yoxlanılmayıb" : "Yoxlanılmayıb"}</span></div></article>
             <article className="summary-card"><Clock3 size={21} /><div><strong>{formatDuration(result.durationSeconds)}</strong><span>Sərf olunan vaxt</span></div></article>
           </div>
 
-          {official && <p className="score-disclaimer">Bal DİM-in 2025 düsturları ilə hesablanır. Bu, yekun rəsmi nəticə deyil: 6 dinləmə sualı daxil edilməyib, yazılı açıq cavablar isə yoxlanılmayıb. Riyaziyyatda kodlaşdırılan 5 cavab rəsmi rəqəmlə tutuşdurulur.</p>}
+          {official && <p className="score-disclaimer">Bal DİM-in 2025 düsturları ilə hesablanır. Bu, yekun rəsmi nəticə deyil: 6 dinləmə sualı daxil edilməyib. İngilis dilində qısa yazılı cavablar rəsmi sözlə yoxlanılır; uzun yazılı cavablar üçün AI yalnız ayrıca təxmini qiymət verir. Riyaziyyatda kodlaşdırılan 5 cavab rəsmi rəqəmlə tutuşdurulur.</p>}
+          {aiGradeCount > 0 && <p className="ai-grade-summary">AI-nin təxmini əlavə qiyməti: +{formatScore(aiEstimatedPoints)} bal. Birlikdə təxmini nəticə: {formatScore(result.score + aiEstimatedPoints)} / 300. Bu rəqəm DİM-in rəsmi qiymətləndirməsi deyil və hesabda saxlanan təsdiqlənmiş bala əlavə olunmur.</p>}
 
           <div className="results-columns">
             <div>
@@ -205,7 +250,7 @@ export function ResultView({ attemptId }: { attemptId: string }) {
                   <article className="subject-result" key={subject}>
                     <div className="subject-result-top"><strong>{subject}</strong><span>{official ? `${formatScore(stats.score)} / 100 ilkin bal` : stats.maxScore ? `${formatScore(stats.score)} / ${formatScore(stats.maxScore)} düzgün` : "Qiymətləndirilməyib"}</span></div>
                     <div className="result-bar"><span style={{ width: `${official ? stats.score : stats.maxScore ? (stats.score / stats.maxScore) * 100 : 0}%` }} /></div>
-                    <div className="subject-counts"><span>{stats.correct} düzgün</span><span>{stats.wrong} səhv</span><span>{stats.unanswered} cavabsız</span><span>{stats.ungraded} yoxlanılmayıb</span></div>
+                    <div className="subject-counts"><span>{stats.correct} düzgün</span><span>{stats.wrong} səhv</span><span>{stats.unanswered} cavabsız</span><span>{stats.ungraded} {official ? "rəsmi yoxlanılmayıb" : "yoxlanılmayıb"}</span></div>
                   </article>
                 ))}
               </div>
@@ -234,8 +279,9 @@ export function ResultView({ attemptId }: { attemptId: string }) {
                 const question = exam.questions.find((item) => item.id === answer.questionId);
                 if (!question) return null;
                 const statusClass = answer.status === "correct" ? "review-correct" : answer.status === "wrong" ? "review-wrong" : answer.status === "ungraded" ? "review-ungraded" : "review-unanswered";
-                const statusLabel = answer.status === "correct" ? "Düzgün" : answer.status === "wrong" ? "Səhv" : answer.status === "ungraded" ? "Yoxlanılmayıb" : "Cavabsız";
+                const statusLabel = openGrades[question.id]?.grade ? "AI ilə təxmini" : answer.status === "correct" ? "Düzgün" : answer.status === "wrong" ? "Səhv" : answer.status === "ungraded" ? "Yoxlanılmayıb" : "Cavabsız";
                 const explanation = aiState[question.id]?.explanation;
+                const openGrade = openGrades[question.id]?.grade;
                 return (
                   <details className={`review-card ${statusClass}`} id={`question-${answer.questionId}`} key={answer.questionId}>
                     <summary>
@@ -280,6 +326,20 @@ export function ResultView({ attemptId }: { attemptId: string }) {
                               {explanation.miniExample && <><h4>Oxşar nümunə</h4><p>{explanation.miniExample}</p></>}
                             </div>
                           )}
+                        </div>
+                      )}
+                      {exam.status === "draft" && answer.status === "ungraded" && question.subject === "İngilis dili" && (question.type === "constructed_response" || question.type === "essay") && answer.selectedAnswerText?.trim() && (
+                        <div className="ai-explanation">
+                          {!openGrade && <button className="button button-secondary" type="button" disabled={openGrades[question.id]?.loading} onClick={() => void gradeOpenAnswer(question.id)}><Sparkles size={17} /> {openGrades[question.id]?.loading ? "AI cavabı yoxlayır..." : "AI ilə qiymətləndir"}</button>}
+                          {!openGrade && <p className="ai-privacy-note">Bu düyməni seçəndə yazdığınız cavab AI xidmətinə göndərilir.</p>}
+                          {openGrades[question.id]?.error && <p role="alert">{openGrades[question.id].error}</p>}
+                          {openGrade && <div className="official-explanation ai-explanation-content">
+                            <strong>AI təxmini qiymətləndirmə · DİM balı deyil</strong>
+                            <p>{openGrade.score === "review" ? "Bu cavab üçün etibarlı təxmini bal seçilmədi; əl ilə yoxlama lazımdır." : `${openGrade.score} / 1 meyar balı (təxminən ${formatScore((openGradeFraction(openGrade.score) ?? 0) * 200 / 37)} nisbi bal)`}</p>
+                            <h4>Səbəb</h4><p>{openGrade.reason}</p>
+                            <h4>Yaxşı tərəf</h4><p>{openGrade.strength}</p>
+                            <h4>Yaxşılaşdırmaq üçün</h4><p>{openGrade.improvement}</p>
+                          </div>}
                         </div>
                       )}
                     </div>

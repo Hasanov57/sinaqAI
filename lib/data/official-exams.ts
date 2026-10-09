@@ -63,7 +63,7 @@ function mapQuestion(question: DatasetQuestion): ExamQuestion {
     audioUrl: question.audio_url ?? undefined,
     acceptedAnswers: question.accepted_answers?.map((answer) => ({
       answerText: answer.answer_text,
-      normalizedAnswer: answer.normalized_answer ?? null,
+      normalizedAnswer: "normalized_answer" in answer && typeof answer.normalized_answer === "string" ? answer.normalized_answer : null,
       score: answer.score,
     })),
     officialRubric: question.official_rubric
