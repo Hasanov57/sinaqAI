@@ -103,14 +103,14 @@ NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
 SUPABASE_SECRET_KEY=
 AI_PROVIDER=gemini
-AI_MODEL=gemini-3.8-flash
+AI_MODEL=gemini-3.5-flash-lite
 GEMINI_API_KEY=
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 ```
 
 The current Supabase dashboard calls these the **Publishable key** and **Secret key**. For an older project, the compatible names `NEXT_PUBLIC_SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY` are also accepted. If copying from Supabase's Connect dialog, put the values under the variable names above: add `NEXT_PUBLIC_` to the publishable key name, keep the secret key server-only, and skip `SUPABASE_JWKS_URL` (this app does not need it).
 
-`SUPABASE_SERVICE_ROLE_KEY` and `GEMINI_API_KEY` are server-only secrets. Never prefix either with `NEXT_PUBLIC_` or import them into client components. Existing setups with the server-only name `AI_API_KEY` are also accepted for Gemini, though `GEMINI_API_KEY` is preferred. The Gemini key is used only by the server route and is never returned to the browser. AI explanations require a signed-in Supabase user and can be requested only for an incorrect multiple-choice response. The server-role key lets the route store personalized explanation caches and enforce a shared eight-requests-per-minute user limit. They are educational assistance, not official DİM material or grading.
+`SUPABASE_SERVICE_ROLE_KEY` and `GEMINI_API_KEY` are server-only secrets. Never prefix either with `NEXT_PUBLIC_` or import them into client components. Existing setups with the server-only name `AI_API_KEY` are also accepted for Gemini, though `GEMINI_API_KEY` is preferred. The Gemini key is used only by the server route and is never returned to the browser. AI explanations do not require registration and are available only for an incorrect multiple-choice response. The server validates the official question and answer, shares cached explanations, and limits anonymous requests by a one-way hash of the visitor IP (eight per minute, 100 per day). They are educational assistance, not official DİM material or grading. Signing in is required only when the student chooses to save an official result to their account.
 
 ## Supabase setup
 
@@ -230,11 +230,11 @@ npm run build
 1. Push this repository to GitHub. `data/raw/izah.pdf` and `.env.local` are ignored and must stay off GitHub.
 2. If the GitHub repository is already connected to Vercel, pushing to the production branch starts a new deployment. Otherwise, in Vercel choose **Add New → Project**, select the repository, and keep the detected Next.js settings.
 3. In Vercel **Project Settings → Environment Variables**, set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` to the values from the same Supabase project used for the import. These are public browser configuration values; choose **Config** if Vercel asks for a type. An older `NEXT_PUBLIC_SUPABASE_ANON_KEY` also works.
-4. Logged-in official result history and the AI route need `SUPABASE_SECRET_KEY` in Vercel. Choose **Secret** and never add `NEXT_PUBLIC_` to its name. The older `SUPABASE_SERVICE_ROLE_KEY` also works. For AI explanations, also set `AI_PROVIDER=gemini`, `AI_MODEL=gemini-3.8-flash`, and the server-only `GEMINI_API_KEY` (choose **Secret**).
+4. Saving official results and the anonymous AI route need `SUPABASE_SECRET_KEY` in Vercel. Choose **Secret** and never add `NEXT_PUBLIC_` to its name. The older `SUPABASE_SERVICE_ROLE_KEY` also works. For AI explanations, also set `AI_PROVIDER=gemini`, `AI_MODEL=gemini-3.5-flash-lite`, and the server-only `GEMINI_API_KEY` (choose **Secret**).
 5. In Supabase **Authentication → URL Configuration**, set **Site URL** to `https://sinaqai.vercel.app` and add `https://sinaqai.vercel.app/**` to **Redirect URLs**. The registration confirmation now returns through `/auth/callback`, so the callback URL must be allowed. Keep `http://localhost:3000/**` there too if local sign-in is needed. New confirmation emails must be requested after changing this setting.
-6. In Vercel **Deployments**, wait for the latest production deployment to show **Ready**. Open the official exam, intentionally submit a wrong multiple-choice answer, click **AI ilə izah et**, sign in, and verify that the site returns to the same question.
+6. Apply all Supabase migrations before deploying this version. In Vercel **Deployments**, wait for the latest production deployment to show **Ready**. Open the official exam while signed out, intentionally submit a wrong multiple-choice answer, and verify **AI ilə izah et** works without login. Then choose **Nəticəni yadda saxla**, sign in, and verify the result appears in the account dashboard.
 
-Run the Supabase migrations and import the official dataset before enabling account-backed exam attempts. Keep the service-role and AI keys in Vercel's encrypted server environment only. Logged-in official attempts are stored in `exam_attempts` and `student_answers`; anonymous/demo progress remains in browser storage. The dashboard reads persisted attempts. The AI route reads the submitted answer and official material on the server, uses Gemini only on request, and caches per question, wrong answer, user, and model.
+Run the Supabase migrations and import the official dataset before enabling account-backed exam attempts. Keep the service-role and AI keys in Vercel's encrypted server environment only. Official attempts are stored in `exam_attempts` and `student_answers` only after the student explicitly chooses to save while signed in; otherwise the result remains in browser storage. The dashboard reads persisted attempts. The AI route verifies the official question and wrong option on the server, uses Gemini only on request, and shares a cache per question, wrong answer, and model.
 
 The current draft flow bundles answers in client-side data so it can be tested without credentials. Before publishing a paid or protected exam, move answer lookup and final grading to a server-only Supabase path.
 

@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { aiReturnPath, authCallbackDestination, getSafeReturnPath, loginPath } from "./return-path";
+import { authCallbackDestination, getSafeReturnPath, loginPath, saveResultReturnPath } from "./return-path";
 
 describe("safe authentication return paths", () => {
-  it("preserves an internal result, query, and question anchor", () => {
-    const destination = aiReturnPath("abc", "q-14");
-    expect(destination).toBe("/results/abc?aiExplain=q-14#question-q-14");
+  it("preserves an internal result-saving intent", () => {
+    const destination = saveResultReturnPath("abc");
+    expect(destination).toBe("/results/abc?saveResult=1");
     expect(getSafeReturnPath(destination)).toBe(destination);
     expect(loginPath(destination)).toContain("returnTo=");
   });
@@ -15,8 +15,8 @@ describe("safe authentication return paths", () => {
   );
 
   it("returns to the requested page after a successful email callback", () => {
-    const url = new URL("https://sinaqai.vercel.app/auth/callback?returnTo=%2Fresults%2Fabc%3FaiExplain%3Dq-14%23question-q-14");
-    expect(authCallbackDestination(url, true)).toBe("/results/abc?aiExplain=q-14#question-q-14");
+    const url = new URL("https://sinaqai.vercel.app/auth/callback?returnTo=%2Fresults%2Fabc%3FsaveResult%3D1");
+    expect(authCallbackDestination(url, true)).toBe("/results/abc?saveResult=1");
     expect(authCallbackDestination(url, false)).toContain("error=confirmation");
   });
 });

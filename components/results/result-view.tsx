@@ -2,11 +2,10 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Check, ChevronDown, CircleDashed, Clock3, RotateCcw, Sparkles, X } from "lucide-react";
+import { Check, ChevronDown, CircleDashed, Clock3, RotateCcw, Save, Sparkles, X } from "lucide-react";
 import { calculateTopicStatistics } from "@/lib/analytics/statistics";
-import { AttemptSyncError, syncOfficialAttempt } from "@/lib/attempts/client";
-import { aiReturnPath, loginPath } from "@/lib/auth/return-path";
-import { getPendingAiIntent } from "@/lib/auth/pending-ai";
+import { syncOfficialAttempt } from "@/lib/attempts/client";
+import { loginPath, saveResultReturnPath } from "@/lib/auth/return-path";
 import type { QuestionExplanation } from "@/lib/ai/schema";
 import { getExam } from "@/lib/data/demo-exams";
 import { createSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase/browser";
@@ -23,7 +22,9 @@ export function ResultView({ attemptId }: { attemptId: string }) {
   const [loaded, setLoaded] = useState(false);
   const [aiState, setAiState] = useState<Record<string, { loading?: boolean; explanation?: QuestionExplanation; error?: string }>>({});
   const [syncWarning, setSyncWarning] = useState("");
-  const pendingConsumed = useRef(false);
+  const [savingResult, setSavingResult] = useState(false);
+  const [savedResult, setSavedResult] = useState(false);
+  const pendingSaveConsumed = useRef(false);
 
   useEffect(() => {
     const hydrationTask = window.setTimeout(async () => {
@@ -67,81 +68,57 @@ export function ResultView({ attemptId }: { attemptId: string }) {
     return [...subjects.entries()];
   }, [result]);
 
-  const explainWrongAnswer = useCallback(async (questionId: string, automatic = false) => {
+  const explainWrongAnswer = useCallback(async (questionId: string) => {
     if (!result) return;
-    if (!isSupabaseConfigured()) {
-      setAiState((state) => ({ ...state, [questionId]: { error: "AI xidməti hazırda aktiv deyil." } }));
-      return;
-    }
+    const answer = result.answers.find((item) => item.questionId === questionId);
+    if (answer?.status !== "wrong" || !answer.selectedKey) return;
     setAiState((state) => ({ ...state, [questionId]: { loading: true } }));
     try {
-      const { data: { user } } = await createSupabaseBrowserClient().auth.getUser();
-      if (!user) {
-        if (automatic) {
-          setAiState((state) => ({ ...state, [questionId]: { error: "İzah üçün hesabınıza daxil olun." } }));
-        } else {
-          window.location.assign(loginPath(aiReturnPath(attemptId, questionId)));
-        }
-        return;
-      }
-      await syncOfficialAttempt(result);
-      setSyncWarning("");
       const response = await fetch("/api/ai/explain", {
         method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ attemptId: result.attemptId, questionId }),
+        body: JSON.stringify({ examId: result.examId, questionId, selectedKey: answer.selectedKey }),
       });
       const payload = await response.json() as { explanation?: QuestionExplanation; error?: string };
       if (!response.ok || !payload.explanation) throw new Error(payload.error ?? "AI izahını hazırda yaratmaq mümkün olmadı. Bir az sonra yenidən cəhd edin.");
       setAiState((state) => ({ ...state, [questionId]: { explanation: payload.explanation } }));
     } catch (error) {
-      if (error instanceof AttemptSyncError && error.status === 401 && !automatic) {
-        window.location.assign(loginPath(aiReturnPath(attemptId, questionId)));
-        return;
-      }
       setAiState((state) => ({ ...state, [questionId]: { error: error instanceof Error ? error.message : "AI izahını hazırda yaratmaq mümkün olmadı. Bir az sonra yenidən cəhd edin." } }));
     }
-  }, [attemptId, result]);
+  }, [result]);
 
-  useEffect(() => {
-    if (!loaded || !result || getExam(result.examId)?.status === "demo") return;
-    const pending = new URLSearchParams(window.location.search).get("aiExplain");
-    if (pending || !isSupabaseConfigured()) return;
-    let active = true;
-    void (async () => {
+  const saveResult = useCallback(async (afterLogin = false) => {
+    if (!result || savingResult) return;
+    if (!isSupabaseConfigured()) {
+      setSyncWarning("Nəticələri yadda saxlamaq hazırda aktiv deyil.");
+      return;
+    }
+    setSavingResult(true);
+    setSyncWarning("");
+    try {
       const { data: { user } } = await createSupabaseBrowserClient().auth.getUser();
-      if (!user || !active) return;
-      try {
-        await syncOfficialAttempt(result);
-        if (!active) return;
-        window.localStorage.removeItem(`sinaqai:sync-error:${attemptId}`);
-        setSyncWarning("");
-        const response = await fetch(`/api/ai/explain?attemptId=${encodeURIComponent(attemptId)}`);
-        if (response.ok) {
-          const payload = await response.json() as { explanations: Record<string, QuestionExplanation> };
-          if (active) setAiState((current) => ({
-            ...current,
-            ...Object.fromEntries(Object.entries(payload.explanations).map(([id, explanation]) => [id, { explanation }])),
-          }));
-        }
-      } catch (error) {
-        if (active) setSyncWarning(error instanceof Error ? error.message : "Nəticə hesabınıza saxlanmadı. Bu səhifəni yeniləyib yenidən cəhd edin.");
+      if (!user) {
+        if (afterLogin) setSyncWarning("Nəticəni yadda saxlamaq üçün əvvəlcə hesabınıza daxil olun.");
+        else window.location.assign(loginPath(saveResultReturnPath(attemptId)));
+        return;
       }
-    })();
-    return () => { active = false; };
-  }, [attemptId, loaded, result]);
+      await syncOfficialAttempt(result);
+      setSavedResult(true);
+    } catch (error) {
+      setSyncWarning(error instanceof Error ? error.message : "Nəticə hesabınıza saxlanmadı. Yenidən cəhd edin.");
+    } finally {
+      setSavingResult(false);
+    }
+  }, [attemptId, result, savingResult]);
 
   useEffect(() => {
-    if (!loaded || !result || pendingConsumed.current) return;
-    const intent = getPendingAiIntent(window.location.href,
-      result.answers.filter((answer) => answer.status === "wrong").map((answer) => answer.questionId));
-    if (!intent) return;
-    const { questionId } = intent;
-    pendingConsumed.current = true;
-    window.history.replaceState(null, "", intent.cleanPath);
-    const card = document.getElementById(`question-${questionId}`) as HTMLDetailsElement | null;
-    if (card) { card.open = true; card.scrollIntoView({ block: "center" }); }
-    void explainWrongAnswer(questionId, true);
-  }, [explainWrongAnswer, loaded, result]);
+    if (!loaded || !result || pendingSaveConsumed.current) return;
+    const url = new URL(window.location.href);
+    if (url.searchParams.get("saveResult") !== "1") return;
+    pendingSaveConsumed.current = true;
+    url.searchParams.delete("saveResult");
+    window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+    void saveResult(true);
+  }, [loaded, result, saveResult]);
 
   if (!loaded) return <div className="runner-loading">Nəticə hesablanır…</div>;
 
@@ -174,7 +151,14 @@ export function ResultView({ attemptId }: { attemptId: string }) {
             <div className="result-actions">
               <Link className="button" href={`/exams/${exam.id}/start`}><RotateCcw size={18} /> Yenidən həll et</Link>
               <Link className="button button-secondary" href="/exams">Başqa imtahan seç</Link>
+              {exam.status !== "demo" && (
+                <button className="button button-secondary" disabled={savingResult || savedResult} onClick={() => void saveResult()} type="button">
+                  {savedResult ? <Check size={18} /> : <Save size={18} />}
+                  {savedResult ? "Nəticə hesabda saxlanıb" : savingResult ? "Nəticə saxlanır..." : "Nəticəni yadda saxla"}
+                </button>
+              )}
             </div>
+            {exam.status !== "demo" && !savedResult && <p>Nəticə hələlik bu brauzerdədir. AI izahı üçün giriş lazım deyil; hesabda saxlamaq üçün düyməni seçin.</p>}
           </div>
           <div className="score-ring" style={{ "--score": `${percentage * 3.6}deg` } as React.CSSProperties}>
             <div>

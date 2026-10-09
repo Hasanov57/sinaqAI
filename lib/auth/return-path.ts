@@ -17,8 +17,8 @@ export function loginPath(returnTo: string): string {
   return `/login?returnTo=${encodeURIComponent(getSafeReturnPath(returnTo))}`;
 }
 
-export function aiReturnPath(attemptId: string, questionId: string): string {
-  const path = `/results/${encodeURIComponent(attemptId)}?aiExplain=${encodeURIComponent(questionId)}#question-${encodeURIComponent(questionId)}`;
+export function saveResultReturnPath(attemptId: string): string {
+  const path = `/results/${encodeURIComponent(attemptId)}?saveResult=1`;
   return getSafeReturnPath(path);
 }
 

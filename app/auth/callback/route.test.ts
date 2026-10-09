@@ -23,9 +23,9 @@ afterEach(() => vi.unstubAllEnvs());
 
 describe("email confirmation callback", () => {
   it("exchanges the code, writes session cookies, and returns to the exact result question", async () => {
-    const request = new NextRequest("https://sinaqai.vercel.app/auth/callback?code=valid&returnTo=%2Fresults%2Fabc%3FaiExplain%3Dq-14%23question-q-14");
+    const request = new NextRequest("https://sinaqai.vercel.app/auth/callback?code=valid&returnTo=%2Fresults%2Fabc%3FsaveResult%3D1");
     const response = await GET(request);
-    expect(response.headers.get("location")).toBe("https://sinaqai.vercel.app/results/abc?aiExplain=q-14#question-q-14");
+    expect(response.headers.get("location")).toBe("https://sinaqai.vercel.app/results/abc?saveResult=1");
     expect(response.cookies.get("sb-test")?.value).toBe("session");
     expect(mocks.exchange).toHaveBeenCalledWith("valid");
   });
